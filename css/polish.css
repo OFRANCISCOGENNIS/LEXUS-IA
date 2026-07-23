@@ -1,0 +1,220 @@
+/* ═══════════════════════════════════════════════════════════════
+   NEXUS · Interface 2.0 — camada de polimento premium
+   Carregada por último: só refina, nunca quebra.
+   ═══════════════════════════════════════════════════════════════ */
+
+:root {
+  /* gradiente-assinatura do acento (matiz principal → vizinho) */
+  --accent-h2: calc(var(--accent-h) + 42);
+  --accent-2: hsl(var(--accent-h2) var(--accent-s) var(--accent-l));
+  --accent-grad: linear-gradient(135deg, var(--accent) 0%, var(--accent-2) 100%);
+  --glow: hsl(var(--accent-h) var(--accent-s) var(--accent-l) / 0.16);
+  --r-lg: 16px;
+}
+[data-theme="dark"] { --glow: hsl(var(--accent-h) var(--accent-s) 60% / 0.13); }
+
+/* ── Sidebar viva ── */
+.sidebar { background: linear-gradient(180deg, var(--bg-deep) 0%, var(--bg) 130%); }
+.ws-logo {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 24px; height: 24px; border-radius: 7px;
+  background: var(--accent-grad); color: #fff; font-size: 12px;
+  box-shadow: 0 2px 8px var(--glow);
+}
+.sidebar-item { position: relative; }
+.sidebar-item:hover { transform: translateX(2px); }
+.sidebar-item:hover .si-icon { color: var(--accent-text); opacity: 1; }
+.sidebar-item.active::before {
+  content: ""; position: absolute; left: -2px; top: 20%; bottom: 20%;
+  width: 3px; border-radius: 3px; background: var(--accent-grad);
+}
+.local-badge {
+  background: linear-gradient(var(--bg-deep), var(--bg-deep)) padding-box,
+              linear-gradient(135deg, var(--accent-soft), transparent 60%) border-box;
+  border: 1px solid transparent;
+}
+
+/* ── Topbar de vidro ── */
+.topbar {
+  background: color-mix(in srgb, var(--bg) 72%, transparent);
+  backdrop-filter: blur(14px) saturate(1.3);
+  -webkit-backdrop-filter: blur(14px) saturate(1.3);
+  border-bottom: 1px solid var(--border);
+}
+
+/* ── Botões ── */
+.btn.primary {
+  background: var(--accent-grad);
+  box-shadow: 0 1px 2px rgba(0,0,0,.12), 0 4px 14px var(--glow);
+}
+.btn.primary:hover { filter: brightness(1.07); box-shadow: 0 2px 4px rgba(0,0,0,.14), 0 6px 20px var(--glow); }
+
+/* ── Cards com borda que acende ── */
+.card { border-radius: var(--r-lg); }
+.card.hoverable:hover {
+  border-color: hsl(var(--accent-h) var(--accent-s) var(--accent-l) / 0.45);
+  box-shadow: 0 2px 6px rgba(20,20,15,.05), 0 14px 34px rgba(20,20,15,.10), 0 0 0 3px var(--accent-softer);
+}
+[data-theme="dark"] .card.hoverable:hover {
+  box-shadow: 0 2px 6px rgba(0,0,0,.35), 0 14px 34px rgba(0,0,0,.45), 0 0 0 3px var(--accent-softer);
+}
+
+/* ── Vidro mais rico: menus, palette, popovers ── */
+.menu, .palette, .fmt-bar, .graph-hud {
+  backdrop-filter: blur(28px) saturate(1.6);
+  -webkit-backdrop-filter: blur(28px) saturate(1.6);
+  position: relative;
+}
+.menu::before, .palette::before {
+  content: ""; position: absolute; inset: 0 0 auto 0; height: 1px;
+  background: linear-gradient(90deg, transparent, hsl(var(--accent-h) 80% 80% / .5), transparent);
+  border-radius: inherit; pointer-events: none;
+}
+.menu { border-radius: 14px; }
+.menu-item .mi-icon { border-radius: 7px; }
+.menu-item.selected .mi-icon, .menu-item:hover .mi-icon {
+  background: var(--accent-soft); color: var(--accent-text);
+}
+.palette { border-radius: 18px; box-shadow: 0 0 0 1px rgba(0,0,0,.04), 0 24px 70px rgba(15,15,20,.28); }
+.palette-item .pi-icon { border-radius: 8px; transition: background var(--t-fast), color var(--t-fast); }
+.palette-item.selected .pi-icon { background: var(--accent-grad); color: #fff; }
+
+/* ── Empty states com ícone iluminado ── */
+.empty-state .es-icon {
+  width: 64px; height: 64px; border-radius: 20px;
+  display: flex; align-items: center; justify-content: center;
+  background: radial-gradient(circle at 30% 25%, var(--accent-soft), var(--accent-softer));
+  box-shadow: inset 0 0 0 1px var(--accent-soft);
+  opacity: 1; font-size: 28px;
+}
+
+/* ── Editor como palco ── */
+.page-head { position: relative; }
+.page-head::before {
+  content: ""; position: absolute; left: -12%; top: -70px;
+  width: 65%; height: 190px; border-radius: 50%;
+  background: radial-gradient(ellipse, var(--glow), transparent 68%);
+  pointer-events: none; z-index: -1;
+}
+.page-title { font-size: clamp(2.1rem, 4.5vw, 2.7rem); }
+
+.block[data-type="quote"] { border-left: none; padding-left: var(--sp-8); position: relative; }
+.block[data-type="quote"]::before {
+  content: "“"; position: absolute; left: 2px; top: -8px;
+  font-family: var(--font-serif); font-size: 44px; line-height: 1;
+  color: var(--accent); opacity: .55;
+}
+.block[data-type="callout"] { box-shadow: var(--shadow-sm); }
+.callout-icon {
+  background: var(--surface); box-shadow: inset 0 0 0 1px var(--border);
+  border-radius: 9px; padding: 2px 7px;
+}
+.todo-check.checked { animation: nx-check-pop 260ms var(--ease-spring); background: var(--accent-grad); border-color: transparent; }
+@keyframes nx-check-pop { 0% { transform: scale(.7); } 60% { transform: scale(1.18); } 100% { transform: scale(1); } }
+
+.code-wrap { box-shadow: inset 0 1px 3px rgba(0,0,0,.04); }
+.code-lang {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--r-full); padding: 1px 9px; margin-top: 4px;
+}
+.wiki-link { border-bottom: none; background: var(--accent-softer); border-radius: 4px; padding: 0 3px; }
+.wiki-link:hover { background: var(--accent-soft); }
+
+.fmt-bar { border-radius: 12px; padding: 4px; }
+.fmt-btn.ai {
+  background: var(--accent-grad); color: #fff; border-radius: 8px; padding: 0 10px;
+}
+.fmt-btn.ai:hover { filter: brightness(1.08); color: #fff; background: var(--accent-grad); }
+
+/* ── Home hero luminoso ── */
+.home-hero { position: relative; padding: var(--sp-4) 0 var(--sp-2); }
+.home-hero::before, .home-hero::after {
+  content: ""; position: absolute; border-radius: 50%; filter: blur(52px);
+  pointer-events: none; z-index: -1;
+}
+.home-hero::before { width: 300px; height: 200px; left: -60px; top: -70px; background: var(--glow); }
+.home-hero::after {
+  width: 220px; height: 160px; left: 260px; top: -40px; opacity: .6;
+  background: hsl(var(--accent-h2) var(--accent-s) var(--accent-l) / 0.12);
+}
+.home-greeting {
+  background: linear-gradient(120deg, var(--text) 20%, var(--accent-strong) 78%, var(--accent-2) 100%);
+  -webkit-background-clip: text; background-clip: text;
+  -webkit-text-fill-color: transparent; color: transparent;
+  width: fit-content;
+}
+.home-date {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--r-full); padding: 4px 14px;
+  font-size: var(--fs-sm); box-shadow: var(--shadow-sm);
+}
+.hq-icon {
+  width: 38px; height: 38px; border-radius: 11px;
+  display: flex; align-items: center; justify-content: center;
+  background: radial-gradient(circle at 30% 25%, var(--accent-soft), var(--accent-softer));
+  box-shadow: inset 0 0 0 1px var(--accent-soft);
+  font-size: 17px;
+}
+.home-stats {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--r-lg); padding: var(--sp-4) var(--sp-2);
+  box-shadow: var(--shadow-sm);
+}
+.home-kpi { position: relative; }
+.home-kpi + .home-kpi::before {
+  content: ""; position: absolute; left: 0; top: 15%; bottom: 15%;
+  width: 1px; background: var(--border);
+}
+.hk-num {
+  background: var(--accent-grad);
+  -webkit-background-clip: text; background-clip: text;
+  -webkit-text-fill-color: transparent; color: transparent;
+}
+
+/* ── Databases ── */
+.db-table-wrap { border-radius: var(--r-lg); box-shadow: var(--shadow-sm); }
+.db-table th { backdrop-filter: blur(6px); }
+.kanban-col {
+  background: color-mix(in srgb, var(--surface-2) 82%, transparent);
+  position: relative; overflow: hidden;
+}
+.kanban-col::before {
+  content: ""; position: absolute; inset: 0 0 auto 0; height: 2px;
+  background: var(--accent-grad); opacity: .28;
+}
+.kanban-card { border-radius: 12px; }
+.kanban-card:active { cursor: grabbing; }
+.kanban-card.dragging { transform: rotate(1.6deg) scale(1.03); box-shadow: var(--shadow-lg); }
+
+/* ── Daily / Settings / Templates / Busca ── */
+.daily-streak { box-shadow: inset 0 0 0 1px var(--warn-soft); border-radius: var(--r-lg); }
+.dc-day.today { background: var(--accent-grad); box-shadow: 0 3px 10px var(--glow); }
+.settings-section { box-shadow: var(--shadow-sm); }
+.accent-swatch.on { box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--accent), 0 4px 12px var(--glow); }
+.seg-btn.on { color: var(--accent-text); }
+.tpl-preview { position: relative; }
+.tpl-card:hover .tpl-preview::after {
+  content: ""; position: absolute; inset: 0;
+  background: linear-gradient(180deg, transparent 55%, var(--accent-softer));
+}
+.tpl-use { background: var(--accent-grad); color: #fff; border-color: transparent; }
+.search-hero { border-radius: var(--r-xl); }
+.search-hero:focus-within { box-shadow: 0 0 0 3px var(--accent-soft), 0 10px 30px var(--glow); }
+.search-result.selected { background: var(--accent-softer); }
+
+/* ── Toast pílula ── */
+.toast { border-radius: var(--r-full); padding: 8px 18px; }
+.toast .t-icon {
+  width: 22px; height: 22px; border-radius: 50%;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: var(--ok-soft); font-size: 12px;
+}
+.toast.warn .t-icon { background: var(--warn-soft); }
+.toast.danger .t-icon { background: var(--danger-soft); }
+
+/* ── Scrollbar acentuada no hover ── */
+*::-webkit-scrollbar-thumb:hover { background: var(--accent); }
+
+/* ── Foco visível com anel gradiente-suave ── */
+:focus-visible { outline-color: var(--accent); }
