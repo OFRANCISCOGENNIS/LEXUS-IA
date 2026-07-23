@@ -31,6 +31,9 @@ async function boot() {
   initRouter(document.getElementById("view"));
 
   document.getElementById("app").classList.add("anim-fade");
+
+  // carrega listeners de IA (ai:selection / ai:page) sem bloquear o boot
+  import("./modules/assistant.js").catch(() => {});
 }
 
 boot().catch((e) => {
