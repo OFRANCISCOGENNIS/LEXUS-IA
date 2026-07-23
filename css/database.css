@@ -1,0 +1,175 @@
+/* ═══════════════ NEXUS · Databases (tabela + kanban) ═══════════════ */
+
+.db-container { max-width: 1200px; margin: 0 auto; padding: var(--sp-8) var(--sp-8) var(--sp-12); }
+
+.db-head { display: flex; align-items: center; gap: var(--sp-3); margin-bottom: var(--sp-4); }
+.db-icon-btn {
+  font-size: 30px; line-height: 1; padding: 6px; border-radius: var(--r-md);
+  transition: background var(--t-fast), transform var(--t-fast); font-style: normal;
+}
+.db-icon-btn:hover { background: var(--surface-hover); transform: scale(1.06); }
+.db-name {
+  flex: 1; border: none; outline: none; background: none;
+  font-size: var(--fs-2xl); font-weight: 730; letter-spacing: -0.015em;
+  color: var(--text); font-family: var(--font-body);
+}
+.db-name:empty::before { content: "Sem nome"; color: var(--text-faint); }
+
+/* ── Barra de views ── */
+.db-toolbar {
+  display: flex; align-items: center; gap: var(--sp-2);
+  border-bottom: 1px solid var(--border);
+  margin-bottom: var(--sp-4); padding-bottom: 0;
+}
+.db-tabs { display: flex; gap: 2px; position: relative; }
+.db-tab {
+  display: flex; align-items: center; gap: 6px;
+  padding: 7px 12px 9px; font-size: var(--fs-sm); font-weight: 550;
+  color: var(--text-3); border-radius: var(--r-sm) var(--r-sm) 0 0;
+  position: relative;
+  transition: color var(--t-fast) var(--ease-out), background var(--t-fast);
+}
+.db-tab:hover { color: var(--text-2); background: var(--surface-hover); }
+.db-tab.active { color: var(--text); }
+.db-tab.active::after {
+  content: ""; position: absolute; left: 8px; right: 8px; bottom: -1px;
+  height: 2px; background: var(--accent); border-radius: 2px;
+  animation: nx-fade-in 200ms var(--ease-out);
+}
+.db-toolbar-right { margin-left: auto; display: flex; align-items: center; gap: var(--sp-1); }
+.db-quicksearch {
+  width: 170px; padding: 5px 10px; border-radius: var(--r-sm);
+  border: 1px solid transparent; background: var(--surface-hover);
+  font-size: var(--fs-sm); transition: border-color var(--t-fast), background var(--t-fast), width var(--t-med) var(--ease-out);
+}
+.db-quicksearch:focus { outline: none; border-color: var(--accent); background: var(--surface); width: 220px; }
+
+.db-viewport { position: relative; }
+.db-view-anim { animation: nx-fade-in 200ms var(--ease-out) both; }
+
+/* ── Tabela ── */
+.db-table-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--r-md); background: var(--surface); }
+.db-table { border-collapse: collapse; width: 100%; font-size: var(--fs-sm); }
+.db-table th {
+  position: sticky; top: 0; z-index: 2;
+  background: var(--surface-2);
+  border-bottom: 1px solid var(--border);
+  padding: 0; text-align: left; font-weight: 600; color: var(--text-2);
+  white-space: nowrap;
+}
+.db-th {
+  display: flex; align-items: center; gap: 6px;
+  padding: 8px 12px; cursor: pointer; user-select: none;
+  transition: background var(--t-fast), color var(--t-fast);
+}
+.db-th:hover { background: var(--surface-hover); color: var(--text); }
+.db-th .th-type { opacity: 0.55; font-size: 11px; }
+.db-th .th-sort { color: var(--accent-text); font-size: 10px; }
+.db-table th.th-add { width: 40px; }
+.th-add-btn {
+  width: 100%; padding: 8px 0; color: var(--text-faint);
+  transition: color var(--t-fast), background var(--t-fast);
+}
+.th-add-btn:hover { color: var(--accent-text); background: var(--surface-hover); }
+
+.db-table td {
+  border-bottom: 1px solid var(--border);
+  border-right: 1px solid var(--border);
+  padding: 0; vertical-align: middle; min-width: 120px; max-width: 340px;
+}
+.db-table td:last-child { border-right: none; }
+.db-table tbody tr { transition: background var(--t-fast); }
+.db-table tbody tr:hover { background: var(--surface-hover); }
+.db-table tbody tr:last-child td { border-bottom: none; }
+
+.db-cell {
+  display: flex; align-items: center; gap: 5px;
+  min-height: 36px; padding: 5px 12px;
+  cursor: pointer; overflow: hidden;
+}
+.db-cell:focus-within, .db-cell.editing {
+  box-shadow: inset 0 0 0 2px var(--accent);
+  border-radius: 3px;
+}
+.db-cell input {
+  width: 100%; border: none; outline: none; background: none;
+  font: inherit; color: inherit; padding: 0;
+}
+.db-cell.cell-title { font-weight: 570; }
+.db-cell.cell-number { justify-content: flex-end; font-variant-numeric: tabular-nums; }
+.db-cell .cell-empty { color: var(--text-faint); font-size: var(--fs-xs); }
+.db-cell a { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.row-menu-btn { opacity: 0; transition: opacity var(--t-fast); }
+tr:hover .row-menu-btn { opacity: 1; }
+
+.db-newrow {
+  display: flex; align-items: center; gap: 8px;
+  padding: 9px 12px; color: var(--text-3); font-size: var(--fs-sm);
+  cursor: pointer; width: 100%;
+  transition: background var(--t-fast), color var(--t-fast);
+}
+.db-newrow:hover { background: var(--surface-hover); color: var(--text); }
+
+/* chips de select */
+.chip.c-gray   { background: var(--surface-active); color: var(--text-2); }
+.chip.c-blue   { background: hsl(214 84% 56% / .14); color: hsl(214 74% 46%); }
+.chip.c-purple { background: hsl(268 70% 58% / .14); color: hsl(268 60% 50%); }
+[data-theme="dark"] .chip.c-blue   { color: hsl(214 90% 72%); }
+[data-theme="dark"] .chip.c-purple { color: hsl(268 85% 78%); }
+
+/* ── Kanban ── */
+.kanban {
+  display: flex; gap: var(--sp-4); align-items: flex-start;
+  overflow-x: auto; padding-bottom: var(--sp-6); min-height: 320px;
+}
+.kanban-col {
+  flex: 0 0 280px; max-width: 280px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  padding: var(--sp-2);
+  display: flex; flex-direction: column; gap: var(--sp-2);
+  transition: background var(--t-fast), border-color var(--t-fast);
+}
+.kanban-col.drop-target { border-color: var(--accent); background: var(--accent-softer); }
+.kanban-col-head {
+  display: flex; align-items: center; gap: var(--sp-2);
+  padding: var(--sp-1) var(--sp-2);
+}
+.kanban-col-head .chip { font-size: var(--fs-xs); }
+.kanban-count { color: var(--text-faint); font-size: var(--fs-xs); font-weight: 600; }
+.kanban-cards { display: flex; flex-direction: column; gap: var(--sp-2); min-height: 8px; }
+
+.kanban-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  padding: var(--sp-2) var(--sp-3);
+  cursor: grab; user-select: none;
+  box-shadow: var(--shadow-sm);
+  transition: transform var(--t-fast) var(--ease-out), box-shadow var(--t-fast) var(--ease-out), opacity var(--t-fast);
+}
+.kanban-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-md); }
+.kanban-card.dragging { opacity: 0.4; }
+.kanban-card .kc-title { font-size: var(--fs-sm); font-weight: 560; margin-bottom: 4px; }
+.kanban-card .kc-meta { display: flex; flex-wrap: wrap; gap: 4px; }
+.kanban-card .kc-meta:empty { display: none; }
+.kanban-drop-hint {
+  height: 3px; border-radius: 2px; background: var(--accent);
+  margin: -4px 4px; animation: nx-fade-in 120ms;
+}
+
+.kanban-add {
+  display: flex; align-items: center; gap: 6px;
+  padding: 7px 10px; border-radius: var(--r-sm);
+  color: var(--text-3); font-size: var(--fs-sm); text-align: left;
+  transition: background var(--t-fast), color var(--t-fast);
+}
+.kanban-add:hover { background: var(--surface-hover); color: var(--text); }
+.kanban-add-input {
+  width: 100%; padding: 7px 10px; border-radius: var(--r-sm);
+  border: 1px solid var(--accent); background: var(--surface);
+  font-size: var(--fs-sm); outline: none;
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}

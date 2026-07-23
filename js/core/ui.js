@@ -37,7 +37,7 @@ export function showMenu(anchor, items, { align = "left", width } = {}) {
       style: `animation-delay:${Math.min(i * 20, 160)}ms`,
       role: "menuitem",
       onclick: (e) => { e.stopPropagation(); close(); item.action?.(); },
-      onmouseenter: () => setSel(actionable.indexOf(el)),
+      onmousemove: () => { const i = actionable.indexOf(el); if (i !== selected) setSel(i); },
     },
       item.icon ? h("i", { class: "mi-icon" }, item.icon) : null,
       h("div", { class: "mi-body" },

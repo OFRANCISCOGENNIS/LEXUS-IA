@@ -758,7 +758,8 @@ function refreshSlashMenu() {
       class: "menu-item" + (i === 0 ? " selected" : ""),
       style: `animation-delay:${Math.min(i * 20, 140)}ms`,
       onclick: () => applySlash(d),
-      onmouseenter: (e) => {
+      onmousemove: (e) => {
+        if (e.currentTarget.classList.contains("selected")) return;
         menu.querySelectorAll(".menu-item").forEach((x) => x.classList.remove("selected"));
         e.currentTarget.classList.add("selected");
       },

@@ -73,7 +73,7 @@ export function openPalette() {
         class: "palette-item" + (i === selected ? " selected" : ""),
         style: `animation-delay:${Math.min(i * 20, 200)}ms`,
         onclick: () => execute(item),
-        onmouseenter: () => { selected = i; paint(); },
+        onmousemove: () => { if (selected !== i) { selected = i; paint(); } },
       },
         h("i", { class: "pi-icon" }, item.icon || "▢"),
         h("div", { class: "pi-body" },
@@ -106,7 +106,7 @@ export function openPalette() {
 
   scrim.addEventListener("pointerdown", closePalette);
   render("");
-  setTimeout(() => input.focus(), 30);
+  input.focus();
 }
 
 function buildResults(query) {
