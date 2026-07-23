@@ -1,0 +1,10 @@
+{
+  "name": "nexus-workspace",
+  "version": "0.1.0",
+  "description": "NEXUS — workspace all-in-one com IA 100% local (WebLLM + WebGPU). Sem API, sem backend: app estático.",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "start": "python3 -m http.server 8080"
+  }
+}

@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="pt-BR" data-theme="light" data-accent="iris">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="color-scheme" content="light dark" />
+  <title>NEXUS — Workspace com IA local</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%E2%97%86%3C/text%3E%3C/svg%3E" />
+  <link rel="stylesheet" href="css/tokens.css" />
+  <link rel="stylesheet" href="css/base.css" />
+  <link rel="stylesheet" href="css/shell.css" />
+  <link rel="stylesheet" href="css/components.css" />
+  <link rel="stylesheet" href="css/editor.css" />
+  <link rel="stylesheet" href="css/database.css" />
+  <link rel="stylesheet" href="css/assistant.css" />
+  <link rel="stylesheet" href="css/views.css" />
+</head>
+<body>
+  <div id="app" class="app">
+    <!-- ══════════ Sidebar ══════════ -->
+    <aside id="sidebar" class="sidebar" aria-label="Navegação">
+      <div class="sidebar-head">
+        <button id="ws-switcher" class="ws-switcher" title="Workspace">
+          <span class="ws-logo">◆</span>
+          <span class="ws-name">NEXUS</span>
+        </button>
+        <button id="sidebar-collapse" class="icon-btn" title="Recolher sidebar (⌘\)" aria-label="Recolher sidebar">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M10 3L5 8l5 5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+      </div>
+
+      <div class="sidebar-actions">
+        <button class="sidebar-item" data-action="open-palette">
+          <span class="si-icon">⌕</span><span class="si-label">Buscar</span>
+          <kbd class="si-kbd">⌘K</kbd>
+        </button>
+        <button class="sidebar-item" data-action="quick-capture">
+          <span class="si-icon">✦</span><span class="si-label">Captura rápida</span>
+          <kbd class="si-kbd">⌘⇧N</kbd>
+        </button>
+        <button class="sidebar-item" data-nav="home">
+          <span class="si-icon">⌂</span><span class="si-label">Início</span>
+        </button>
+        <button class="sidebar-item" data-nav="daily">
+          <span class="si-icon">☀</span><span class="si-label">Nota diária</span>
+        </button>
+        <button class="sidebar-item" data-nav="assistant">
+          <span class="si-icon">✳</span><span class="si-label">Assistente IA</span>
+        </button>
+        <button class="sidebar-item" data-nav="graph">
+          <span class="si-icon">◉</span><span class="si-label">Grafo</span>
+        </button>
+      </div>
+
+      <div class="sidebar-scroll">
+        <section class="sidebar-section" id="section-favorites" hidden>
+          <button class="section-title" data-toggle-section="favorites">
+            <span class="section-chevron">▸</span> Favoritos
+          </button>
+          <div class="section-body" id="favorites-list"></div>
+        </section>
+
+        <section class="sidebar-section" id="section-pages">
+          <button class="section-title" data-toggle-section="pages">
+            <span class="section-chevron">▸</span> Páginas
+          </button>
+          <div class="section-body" id="pages-tree"></div>
+          <button class="sidebar-item sidebar-add" data-action="new-page">
+            <span class="si-icon">＋</span><span class="si-label">Nova página</span>
+          </button>
+        </section>
+
+        <section class="sidebar-section" id="section-dbs">
+          <button class="section-title" data-toggle-section="dbs">
+            <span class="section-chevron">▸</span> Databases
+          </button>
+          <div class="section-body" id="dbs-list"></div>
+          <button class="sidebar-item sidebar-add" data-action="new-database">
+            <span class="si-icon">＋</span><span class="si-label">Nova database</span>
+          </button>
+        </section>
+      </div>
+
+      <div class="sidebar-foot">
+        <button class="sidebar-item" data-nav="templates">
+          <span class="si-icon">▤</span><span class="si-label">Templates</span>
+        </button>
+        <button class="sidebar-item" data-nav="trash">
+          <span class="si-icon">🗑</span><span class="si-label">Lixeira</span>
+        </button>
+        <button class="sidebar-item" data-nav="settings">
+          <span class="si-icon">⚙</span><span class="si-label">Configurações</span>
+        </button>
+        <div class="local-badge" title="Toda a IA e todos os dados rodam apenas neste dispositivo">
+          <span class="badge-dot"></span> 100% local · seus dados nunca saem do dispositivo
+        </div>
+      </div>
+    </aside>
+
+    <!-- ══════════ Main ══════════ -->
+    <div class="main-wrap">
+      <header id="topbar" class="topbar">
+        <div class="topbar-left">
+          <button id="sidebar-expand" class="icon-btn" title="Expandir sidebar" hidden aria-label="Expandir sidebar">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M6 3l5 5-5 5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </button>
+          <nav id="breadcrumb" class="breadcrumb" aria-label="Caminho"></nav>
+        </div>
+        <div class="topbar-right" id="topbar-actions"></div>
+      </header>
+      <main id="view" class="view" tabindex="-1"></main>
+    </div>
+  </div>
+
+  <!-- Overlays raiz (palette, modais, toasts, menus) -->
+  <div id="overlay-root"></div>
+  <div id="toast-root" class="toast-root" aria-live="polite"></div>
+
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>
