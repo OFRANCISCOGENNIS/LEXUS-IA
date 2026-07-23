@@ -10,8 +10,9 @@ import { setTheme } from "../shell.js";
 import { pageToMarkdown } from "../core/markdown.js";
 
 const ACCENTS = [
-  ["iris", "hsl(248 72% 62%)"], ["blue", "hsl(214 84% 56%)"], ["teal", "hsl(176 62% 44%)"],
-  ["green", "hsl(148 55% 44%)"], ["amber", "hsl(36 90% 50%)"], ["rose", "hsl(346 72% 56%)"],
+  ["slate", "hsl(215 28% 46%)"], ["navy", "hsl(222 45% 38%)"], ["iris", "hsl(248 72% 62%)"],
+  ["blue", "hsl(214 84% 56%)"], ["teal", "hsl(176 62% 44%)"], ["green", "hsl(148 55% 44%)"],
+  ["amber", "hsl(36 90% 50%)"], ["rose", "hsl(346 72% 56%)"],
 ];
 
 export default {

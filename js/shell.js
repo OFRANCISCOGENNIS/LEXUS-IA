@@ -15,7 +15,7 @@ export function applyAppearance() {
   const theme = getSetting("theme", "auto");
   const dark = theme === "dark" || (theme === "auto" && matchMedia("(prefers-color-scheme: dark)").matches);
   html.dataset.theme = dark ? "dark" : "light";
-  html.dataset.accent = getSetting("accent", "iris");
+  html.dataset.accent = getSetting("accent", "slate");
   html.dataset.density = getSetting("density", "comfortable");
   html.dataset.font = getSetting("font", "sans");
   html.dataset.pagewidth = getSetting("pagewidth", "normal");
