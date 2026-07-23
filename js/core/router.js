@@ -1,5 +1,5 @@
 // ═══════════════ NEXUS · Router (hash-based, lazy modules) ═══════════════
-// Rotas: #/home · #/page/:id · #/db/:id · #/daily · #/graph · #/assistant
+// Rotas: #/home · #/page/:id · #/db/:id · #/daily · #/graph
 //        #/settings · #/templates · #/trash · #/search/:q?
 
 import { bus } from "./bus.js";

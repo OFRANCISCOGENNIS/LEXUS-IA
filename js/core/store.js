@@ -107,16 +107,15 @@ async function seed() {
     icon: "◆",
     blocks: [
       makeBlock("h1", "Bem-vindo ao NEXUS"),
-      makeBlock("p", "Seu workspace all-in-one com <b>IA 100% local</b> — sem API, sem servidor, sem conta. Tudo o que você escreve vive apenas neste dispositivo."),
-      makeBlock("callout", "A IA roda no seu navegador via WebGPU. Abra o <b>Assistente IA</b> na barra lateral para baixar um modelo (uma única vez) e usá-lo offline.", { icon: "✳", color: "accent" }),
+      makeBlock("p", "Seu workspace all-in-one <b>100% local</b> — sem API, sem servidor, sem conta. Tudo o que você escreve vive apenas neste dispositivo."),
       makeBlock("h2", "Comece por aqui"),
       makeBlock("todo", "Pressione <code>Ctrl/⌘ K</code> para abrir o command palette"),
       makeBlock("todo", "Digite <code>/</code> em qualquer linha para inserir blocos"),
-      makeBlock("todo", "Selecione um texto para formatar ou acionar a IA"),
+      makeBlock("todo", "Selecione um texto para formatar"),
       makeBlock("todo", "Crie uma database e arraste cartões no Kanban"),
       makeBlock("todo", "Use <code>[[</code> para linkar páginas — backlinks aparecem no rodapé"),
       makeBlock("h2", "Privacidade absoluta"),
-      makeBlock("quote", "Seus dados nunca saem do dispositivo. O compute é seu — sem limites de uso, sem créditos de IA."),
+      makeBlock("quote", "Seus dados nunca saem do dispositivo."),
       makeBlock("p", "Explore o grafo de conhecimento, as notas diárias e os templates na barra lateral."),
     ],
   });
@@ -128,7 +127,7 @@ async function seed() {
   demo.rows = [
     makeRow(demo, { title: "Lançar o NEXUS", [demo.properties[1].id]: stDoing.id, [demo.properties[2].id]: prHigh.id }),
     makeRow(demo, { title: "Escrever documentação", [demo.properties[1].id]: stTodo.id, [demo.properties[2].id]: prMed.id }),
-    makeRow(demo, { title: "Configurar IA local", [demo.properties[1].id]: stDone.id, [demo.properties[2].id]: prHigh.id }),
+    makeRow(demo, { title: "Organizar workspace", [demo.properties[1].id]: stDone.id, [demo.properties[2].id]: prHigh.id }),
   ];
   databases.set(demo.id, demo);
 

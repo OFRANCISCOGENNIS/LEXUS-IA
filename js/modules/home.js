@@ -22,7 +22,6 @@ export default {
       { icon: "🗎", title: "Nova Página", desc: "Criar um novo documento", run: () => newPage() },
       { icon: "▦", title: "Nova Database", desc: "Tabelas e kanban", run: () => newDatabase() },
       { icon: "☰", title: "Diário de Bordo", desc: "Acessar registro diário", run: () => { const p = getOrCreateDaily(); navigate("page", p.id); } },
-      { icon: "✳", title: "Assistente IA", desc: "IA local e segura", run: () => navigate("assistant") },
     ];
     const qa = h("div", { class: "home-quick" });
     actions.forEach((a, i) => qa.appendChild(h("button", {

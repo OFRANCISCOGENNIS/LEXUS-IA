@@ -14,7 +14,6 @@ async function boot() {
   registerRoute("db", () => import("./modules/database.js"));
   registerRoute("daily", () => import("./modules/daily.js"));
   registerRoute("graph", () => import("./modules/graph.js"));
-  registerRoute("assistant", () => import("./modules/assistant.js"));
   registerRoute("settings", () => import("./modules/settings.js"));
   registerRoute("templates", () => import("./modules/templates.js"));
   registerRoute("trash", () => import("./modules/trash.js"));
@@ -31,9 +30,6 @@ async function boot() {
   initRouter(document.getElementById("view"));
 
   document.getElementById("app").classList.add("anim-fade");
-
-  // carrega listeners de IA (ai:selection / ai:page) sem bloquear o boot
-  import("./modules/assistant.js").catch(() => {});
 }
 
 boot().catch((e) => {

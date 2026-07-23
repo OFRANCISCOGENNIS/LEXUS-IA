@@ -1040,22 +1040,6 @@ function updateFmtBar() {
   const savedRange = range.cloneRange();
 
   fmtBar = h("div", { class: "fmt-bar" },
-    fmtButton("✳ IA", "ai", (e) => {
-      e.preventDefault();
-      const pageId = state.page.id;
-      hideFmtBar();
-      bus.emit("ai:selection", {
-        text, pageId,
-        rect: savedRange.getBoundingClientRect(),
-        apply: (newText) => {
-          const s = getSelection();
-          s.removeAllRanges(); s.addRange(savedRange);
-          document.execCommand("insertText", false, newText);
-          syncBlockFromSelection();
-        },
-      });
-    }),
-    h("span", { class: "fmt-sep" }),
     fmtButton("B", "b", cmd("bold"), "bold"),
     fmtButton("I", "i", cmd("italic"), "italic"),
     fmtButton("U", "u", cmd("underline"), "underline"),
@@ -1132,10 +1116,6 @@ function setupTopbar(page) {
   const historyBtn = h("button", { class: "icon-btn", title: "Histórico de versões", "aria-label": "Histórico" }, "↺");
   historyBtn.onclick = () => showHistory(page);
 
-  const aiBtn = h("button", { class: "btn ghost sm", style: "color:var(--accent-text)", onclick: () => {
-    bus.emit("ai:page", { pageId: page.id });
-  } }, "✳ IA");
-
   const moreBtn = h("button", { class: "icon-btn", title: "Mais opções", "aria-label": "Mais opções" }, "⋯");
   moreBtn.onclick = (e) => showMenu(e.currentTarget, [
     { icon: "★", title: page.favorite ? "Remover dos favoritos" : "Adicionar aos favoritos",
@@ -1155,7 +1135,7 @@ function setupTopbar(page) {
     } },
   ], { align: "right" });
 
-  actions.append(aiBtn, focusBtn, historyBtn, moreBtn);
+  actions.append(focusBtn, historyBtn, moreBtn);
 }
 
 function toggleFocusMode(btn) {
