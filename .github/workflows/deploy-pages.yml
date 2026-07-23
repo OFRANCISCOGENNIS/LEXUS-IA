@@ -1,0 +1,48 @@
+name: Publicar NEXUS no GitHub Pages
+
+on:
+  push:
+    branches:
+      - main
+      - claude/nexus-ai-workspace-h6w98g
+  workflow_dispatch:
+
+# Permissões necessárias para o deploy do Pages
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Um deploy por vez; cancela execuções antigas em andamento
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configurar Pages
+        uses: actions/configure-pages@v5
+        with:
+          # tenta habilitar o Pages automaticamente (fonte = GitHub Actions)
+          enablement: true
+
+      # App 100% estático: desativa o Jekyll para servir js/ e css/ como estão
+      - name: Adicionar .nojekyll
+        run: touch .nojekyll
+
+      - name: Empacotar site (raiz do repositório)
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: .
+
+      - name: Publicar no Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
