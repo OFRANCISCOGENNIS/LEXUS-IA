@@ -4,7 +4,11 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="color-scheme" content="light dark" />
-  <title>NEXUS — Workspace com IA local</title>
+  <meta name="theme-color" content="#141416" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-title" content="NEXUS" />
+  <title>NEXUS — Workspace 100% local</title>
+  <link rel="manifest" href="manifest.webmanifest" />
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%E2%97%86%3C/text%3E%3C/svg%3E" />
   <link rel="stylesheet" href="css/tokens.css" />
   <link rel="stylesheet" href="css/base.css" />
@@ -16,6 +20,7 @@
   <link rel="stylesheet" href="css/productivity.css" />
   <link rel="stylesheet" href="css/polish.css" />
   <link rel="stylesheet" href="css/mobile.css" />
+  <link rel="stylesheet" href="css/print.css" media="print" />
 </head>
 <body>
   <div id="app" class="app">
@@ -123,5 +128,11 @@
   <div id="toast-root" class="toast-root" aria-live="polite"></div>
 
   <script type="module" src="js/app.js"></script>
+  <script>
+    // PWA: registra o service worker (offline / instalável). Só em contexto seguro.
+    if ("serviceWorker" in navigator && (location.protocol === "https:" || location.hostname === "localhost")) {
+      addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(() => {}));
+    }
+  </script>
 </body>
 </html>

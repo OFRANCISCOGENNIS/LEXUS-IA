@@ -5,7 +5,7 @@
 import {
   getPage, updatePage, touchPageBlocks, makeBlock, listPages, createPage,
   snapshotPage, listVersions, restoreVersion, backlinksTo, unlinkedMentions,
-  pageWordCount, deletePage, duplicatePage,
+  pageWordCount, deletePage, duplicatePage, getSetting, setSetting,
 } from "../core/store.js";
 import { bus } from "../core/bus.js";
 import { navigate } from "../core/router.js";
@@ -13,7 +13,7 @@ import {
   h, uid, debounce, sanitizeInline, stripHtml, escapeHtml, fuzzyScore, flip,
   positionFloating, fmtRelative, readingTime, clamp,
 } from "../core/utils.js";
-import { showMenu, closeMenus, toast, showModal, emojiPicker, confirmDialog } from "../core/ui.js";
+import { showMenu, closeMenus, toast, showModal, emojiPicker, confirmDialog, promptDialog } from "../core/ui.js";
 import { pageToMarkdown } from "../core/markdown.js";
 
 /* ── Definições de blocos para o slash menu ── */
@@ -31,6 +31,7 @@ const BLOCK_DEFS = [
   { type: "callout", icon: "💡", title: "Callout", desc: "Destaque com ícone e cor", kw: "callout destaque aviso" },
   { type: "code", icon: "⌗", title: "Código", desc: "Bloco de código com highlight", kw: "codigo code snippet" },
   { type: "divider", icon: "—", title: "Divisor", desc: "Linha horizontal", kw: "divisor linha separador" },
+  { type: "toc", icon: "☰", title: "Sumário", desc: "Índice automático dos títulos", kw: "sumario toc indice tabela conteudo" },
   { type: "image", icon: "🖼", title: "Imagem", desc: "Envie ou cole uma imagem", kw: "imagem foto image" },
 ];
 
@@ -137,6 +138,9 @@ function render(container, page) {
   container.innerHTML = "";
   const wrap = h("div", { class: "page-container" });
 
+  // ── Capa (banner) ──
+  if (page.cover) wrap.appendChild(renderCover(page));
+
   // ── Cabeçalho: ícone + título ──
   const head = h("div", { class: "page-head" });
   const iconBtn = h("button", {
@@ -168,6 +172,12 @@ function render(container, page) {
 
   const meta = h("div", { class: "page-meta" });
   updateMeta(meta, page);
+
+  // ação para adicionar capa (aparece no hover quando ainda não há capa)
+  if (!page.cover && !page.locked) {
+    const addCover = h("button", { class: "page-add-cover", onclick: () => pickCover(page) }, "🖼 Adicionar capa");
+    head.appendChild(addCover);
+  }
 
   head.append(iconBtn, title, meta);
   wrap.appendChild(head);
@@ -302,6 +312,9 @@ function renderBlock(block, { num = 0, inToggle = false } = {}) {
   // conteúdo
   if (block.type === "divider") {
     el.appendChild(h("hr"));
+    el.tabIndex = -1;
+  } else if (block.type === "toc") {
+    el.appendChild(renderToc());
     el.tabIndex = -1;
   } else if (block.type === "image") {
     el.appendChild(renderImage(block));
@@ -600,6 +613,53 @@ function onPaste(e, content, block) {
   focusBlock(last.id, false);
 }
 
+/* ═══════════ Capa (banner) ═══════════ */
+function renderCover(page) {
+  const el = h("div", { class: "page-cover" },
+    h("img", { src: page.cover, alt: "" }),
+    page.locked ? null : h("div", { class: "cover-actions" },
+      h("button", { class: "btn sm", onclick: () => pickCover(page) }, "Trocar"),
+      h("button", { class: "btn sm ghost", onclick: () => { updatePage(page.id, { cover: "" }); navigate("page", page.id); } }, "Remover"))
+  );
+  return el;
+}
+function pickCover(page) {
+  const input = h("input", { type: "file", accept: "image/*", style: "display:none" });
+  input.addEventListener("change", () => {
+    const f = input.files[0];
+    if (!f) return;
+    const reader = new FileReader();
+    reader.onload = () => { updatePage(page.id, { cover: reader.result }); navigate("page", page.id); };
+    reader.readAsDataURL(f);
+  });
+  document.body.appendChild(input);
+  input.click();
+  setTimeout(() => input.remove(), 1000);
+}
+
+/* ═══════════ Sumário automático (TOC) ═══════════ */
+function renderToc() {
+  const el = h("div", { class: "block-toc" });
+  const build = () => {
+    el.innerHTML = "";
+    const headings = state.page.blocks.filter((b) => ["h1", "h2", "h3", "h4"].includes(b.type) && stripHtml(b.content).trim());
+    if (!headings.length) { el.appendChild(h("div", { class: "toc-empty" }, "Sem títulos ainda — adicione H1–H4 para montar o sumário.")); return; }
+    headings.forEach((b) => {
+      el.appendChild(h("button", {
+        class: "toc-link toc-" + b.type,
+        onclick: () => {
+          const target = state.blocksEl.querySelector(`[data-block-id="${b.id}"]`);
+          target?.scrollIntoView({ behavior: "smooth", block: "center" });
+          target?.querySelector(".block-content") && placeCaret(target.querySelector(".block-content"), true);
+        },
+      }, stripHtml(b.content)));
+    });
+  };
+  build();
+  el.rebuild = build;
+  return el;
+}
+
 /* ═══════════ Imagens ═══════════ */
 function renderImage(block) {
   if (block.props?.src) {
@@ -702,7 +762,7 @@ const slashState = { open: false, menu: null, block: null, contentEl: null, quer
 
 function maybeSlashMenu(content, block) {
   const before = textBeforeCaret(content);
-  const m = before.match(/(?:^|\s)\/([\w-]*)$/);
+  const m = before.match(/(?:^|\s)\/([^\s/]*)$/); // aceita acentos e outros caracteres
   if (m) {
     slashState.query = m[1];
     if (!slashState.open) openSlashMenu(content, block);
@@ -784,7 +844,7 @@ function moveSlashSel(dir) {
 function applySlash(def) {
   const { block, contentEl } = slashState;
   // remove o texto "/query" digitado
-  const text = contentEl.innerHTML.replace(/\/[\w-]*(\s|&nbsp;)?$/, "");
+  const text = contentEl.innerHTML.replace(/\/[^\s/]*(\s|&nbsp;)?$/, "");
   block.content = sanitizeInline(text);
   block.type = def.type;
   if (def.type === "callout") block.props = { icon: "💡", ...block.props };
@@ -1128,6 +1188,11 @@ function setupTopbar(page) {
       import("../core/utils.js").then(({ download }) =>
         download((page.title || "pagina") + ".md", pageToMarkdown(page), "text/markdown"));
     } },
+    { icon: "⎙", title: "Exportar como PDF (imprimir)", action: () => {
+      document.title = page.title || "NEXUS";
+      hideFmtBar(); closeMenus();
+      setTimeout(() => window.print(), 60);
+    } },
     { sep: true },
     { icon: "🗑", title: "Mover para a lixeira", danger: true, action: async () => {
       const ok = await confirmDialog({ title: "Mover para a lixeira?", message: "Você pode restaurar depois na Lixeira.", confirmText: "Mover", danger: true });
@@ -1144,6 +1209,33 @@ function toggleFocusMode(btn) {
   btn.classList.toggle("active", state.focusMode);
   if (state.focusMode) {
     toast("Modo foco — Esc para sair", { type: "info", icon: "◎" });
+
+    // HUD: contador de palavras + meta diária + tempo
+    const goal = getFocusGoal();
+    const hud = h("div", { class: "focus-hud" });
+    const bar = h("div", { class: "fh-bar" }, h("div", { class: "fh-fill" }));
+    const label = h("div", { class: "fh-label" });
+    const goalBtn = h("button", { class: "fh-goal", title: "Definir meta de palavras" }, "🎯 meta");
+    hud.append(h("div", { class: "fh-count" }, label), bar, goalBtn);
+    document.body.appendChild(hud);
+    const startWords = pageWordCount(state.page);
+
+    const updateHud = () => {
+      const words = pageWordCount(state.page);
+      const written = Math.max(0, words - startWords);
+      const g = getFocusGoal();
+      label.textContent = `${words} palavras · +${written} nesta sessão`;
+      const pct = g ? clamp((written / g) * 100, 0, 100) : 0;
+      bar.querySelector(".fh-fill").style.width = pct + "%";
+      goalBtn.textContent = g ? `🎯 ${written}/${g}` : "🎯 meta";
+      if (g && written >= g && !state._goalHit) { state._goalHit = true; toast("Meta de escrita atingida! 🎉", { type: "ok" }); }
+    };
+    goalBtn.onclick = async () => {
+      const v = await promptDialog({ title: "Meta de palavras da sessão", value: String(getFocusGoal() || 300) });
+      const n = parseInt(v, 10);
+      if (n >= 0) { setFocusGoal(n); state._goalHit = false; updateHud(); }
+    };
+
     const onMove = () => {
       const sel = getSelection();
       const node = sel.anchorNode;
@@ -1151,21 +1243,29 @@ function toggleFocusMode(btn) {
       state.blocksEl.querySelectorAll(".focus-current").forEach((x) => x.classList.remove("focus-current"));
       if (blockEl) {
         blockEl.classList.add("focus-current");
-        blockEl.scrollIntoView({ block: "center", behavior: "smooth" });
+        blockEl.scrollIntoView({ block: "center", behavior: "smooth" }); // scroll estilo máquina de escrever
       }
     };
+    const onInput = () => updateHud();
     const onEsc = (e) => { if (e.key === "Escape") toggleFocusMode(btn); };
     document.addEventListener("selectionchange", onMove);
+    state.blocksEl.addEventListener("input", onInput, true);
     addEventListener("keydown", onEsc);
+    updateHud();
     state.focusCleanup = () => {
       document.removeEventListener("selectionchange", onMove);
+      state.blocksEl?.removeEventListener("input", onInput, true);
       removeEventListener("keydown", onEsc);
+      hud.remove();
+      state._goalHit = false;
     };
   } else {
     state.focusCleanup?.();
     state.blocksEl?.querySelectorAll(".focus-current").forEach((x) => x.classList.remove("focus-current"));
   }
 }
+function getFocusGoal() { return Number(getSetting("writeGoal", 300)) || 0; }
+function setFocusGoal(n) { setSetting("writeGoal", n); }
 
 /* ═══════════ Histórico de versões com diff ═══════════ */
 async function showHistory(page) {

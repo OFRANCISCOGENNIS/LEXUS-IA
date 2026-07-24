@@ -1,0 +1,25 @@
+/* ═══════════════ NEXUS · Impressão / Export PDF ═══════════════
+   Aplicado só em @media print (link media="print"). Esconde a interface
+   e imprime apenas a página aberta, em papel limpo. */
+
+@page { margin: 2cm; }
+
+.sidebar, .topbar, #overlay-root, .toast-root, #drawer-scrim,
+.block-handle, .page-meta, .backlinks, .db-toolbar-right,
+.home-quick, .prod-tabs, .prod-toolbar { display: none !important; }
+
+.app { display: block !important; height: auto !important; }
+.main-wrap { width: 100% !important; }
+.view { overflow: visible !important; height: auto !important; }
+.page-container { max-width: 100% !important; padding: 0 !important; }
+
+body { background: #fff !important; color: #000 !important; }
+
+.page-title, .block-content, .home-greeting { color: #000 !important; }
+.block { break-inside: avoid; }
+.block[data-type="callout"] { border: 1px solid #ccc !important; background: #f7f7f7 !important; }
+.code-wrap { border: 1px solid #ccc !important; background: #f7f7f7 !important; }
+.page-cover { max-height: 180px !important; }
+
+a { color: #000 !important; text-decoration: underline; }
+.wiki-link { color: #000 !important; background: none !important; }

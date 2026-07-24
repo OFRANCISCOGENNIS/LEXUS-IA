@@ -276,7 +276,62 @@
 }
 .version-item:hover { background: var(--surface-hover); }
 
-/* ── Modo foco ── */
+/* ── Modo foco / máquina de escrever ── */
 .focus-mode .sidebar, .focus-mode .topbar { opacity: 0; pointer-events: none; }
 .focus-mode .block:not(.focus-current) { opacity: 0.25; transition: opacity 300ms var(--ease-out); }
 .focus-mode .block { transition: opacity 300ms var(--ease-out); }
+.focus-mode .view { scroll-padding-top: 40vh; }
+
+.focus-hud {
+  position: fixed; bottom: var(--sp-5); left: 50%; transform: translateX(-50%);
+  z-index: 120; display: flex; align-items: center; gap: var(--sp-3);
+  padding: 8px 16px; border-radius: var(--r-full);
+  background: var(--glass);
+  backdrop-filter: blur(24px) saturate(1.4); -webkit-backdrop-filter: blur(24px) saturate(1.4);
+  border: 1px solid var(--glass-border); box-shadow: var(--shadow-lg);
+  font-size: var(--fs-sm); animation: nx-slide-up var(--t-panel) var(--ease-out) both;
+}
+.fh-count { color: var(--text-2); white-space: nowrap; }
+.fh-bar { width: 120px; height: 6px; border-radius: var(--r-full); background: var(--surface-active); overflow: hidden; }
+.fh-fill { height: 100%; background: var(--accent); border-radius: var(--r-full); transition: width var(--t-med) var(--ease-out); }
+.fh-goal { font-size: var(--fs-xs); color: var(--text-3); padding: 3px 8px; border-radius: var(--r-full); }
+.fh-goal:hover { background: var(--surface-hover); color: var(--text); }
+
+/* ── Capa (banner) ── */
+.page-cover {
+  position: relative; height: 200px; margin: calc(-1 * var(--sp-8)) calc(-1 * var(--sp-8)) var(--sp-5);
+  overflow: hidden; background: var(--surface-2);
+}
+.page-cover img { width: 100%; height: 100%; object-fit: cover; }
+.cover-actions {
+  position: absolute; right: var(--sp-4); bottom: var(--sp-3);
+  display: flex; gap: var(--sp-2); opacity: 0; transition: opacity var(--t-fast);
+}
+.page-cover:hover .cover-actions { opacity: 1; }
+.cover-actions .btn { backdrop-filter: blur(10px); background: var(--glass); }
+.page-add-cover {
+  display: block; font-size: var(--fs-xs); color: var(--text-faint);
+  padding: 4px 8px; border-radius: var(--r-sm); margin-bottom: 4px;
+  opacity: 0; transition: opacity var(--t-fast), background var(--t-fast);
+}
+.page-head:hover .page-add-cover { opacity: 1; }
+.page-add-cover:hover { background: var(--surface-hover); color: var(--text-2); }
+
+/* ── Sumário (TOC) ── */
+.block-toc {
+  border-left: 2px solid var(--border); padding: var(--sp-1) 0 var(--sp-1) var(--sp-4);
+  margin: var(--sp-2) 0; width: 100%;
+}
+.toc-link {
+  display: block; width: 100%; text-align: left;
+  padding: 3px 6px; border-radius: var(--r-sm);
+  color: var(--text-2); font-size: var(--fs-sm);
+  transition: background var(--t-fast), color var(--t-fast);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.toc-link:hover { background: var(--surface-hover); color: var(--accent-text); }
+.toc-h1 { font-weight: 600; }
+.toc-h2 { padding-left: 18px; }
+.toc-h3 { padding-left: 32px; font-size: var(--fs-xs); }
+.toc-h4 { padding-left: 46px; font-size: var(--fs-xs); }
+.toc-empty { font-size: var(--fs-xs); color: var(--text-faint); padding: 4px 6px; }
