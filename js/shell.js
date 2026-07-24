@@ -111,7 +111,8 @@ export function renderBreadcrumb() {
   const sep = () => bc.appendChild(h("span", { class: "crumb-sep" }, "/"));
 
   const names = {
-    home: "Início", daily: "Notas diárias", productivity: "Produtividade", graph: "Grafo",
+    home: "Início", daily: "Notas diárias", tasks: "Tarefas", productivity: "Produtividade",
+    tags: "Tags", graph: "Grafo",
     settings: "Configurações", templates: "Templates", trash: "Lixeira", search: "Busca",
   };
   if (name === "page") {

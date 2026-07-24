@@ -6,6 +6,7 @@ import {
   getPage, updatePage, touchPageBlocks, makeBlock, listPages, createPage,
   snapshotPage, listVersions, restoreVersion, backlinksTo, unlinkedMentions,
   pageWordCount, deletePage, duplicatePage, getSetting, setSetting,
+  listDatabases, getDatabase,
 } from "../core/store.js";
 import { bus } from "../core/bus.js";
 import { navigate } from "../core/router.js";
@@ -32,6 +33,7 @@ const BLOCK_DEFS = [
   { type: "code", icon: "⌗", title: "Código", desc: "Bloco de código com highlight", kw: "codigo code snippet" },
   { type: "divider", icon: "—", title: "Divisor", desc: "Linha horizontal", kw: "divisor linha separador" },
   { type: "toc", icon: "☰", title: "Sumário", desc: "Índice automático dos títulos", kw: "sumario toc indice tabela conteudo" },
+  { type: "chart", icon: "📊", title: "Gráfico", desc: "Barras a partir de uma database", kw: "grafico chart barra kpi dashboard database" },
   { type: "image", icon: "🖼", title: "Imagem", desc: "Envie ou cole uma imagem", kw: "imagem foto image" },
 ];
 
@@ -180,6 +182,7 @@ function render(container, page) {
   }
 
   head.append(iconBtn, title, meta);
+  if (!page.locked) head.appendChild(renderTags(page));
   wrap.appendChild(head);
 
   // ── Blocos ──
@@ -315,6 +318,9 @@ function renderBlock(block, { num = 0, inToggle = false } = {}) {
     el.tabIndex = -1;
   } else if (block.type === "toc") {
     el.appendChild(renderToc());
+    el.tabIndex = -1;
+  } else if (block.type === "chart") {
+    el.appendChild(renderChart(block));
     el.tabIndex = -1;
   } else if (block.type === "image") {
     el.appendChild(renderImage(block));
@@ -613,6 +619,38 @@ function onPaste(e, content, block) {
   focusBlock(last.id, false);
 }
 
+/* ═══════════ Tags da página ═══════════ */
+function renderTags(page) {
+  const row = h("div", { class: "page-tags" });
+  const paint = () => {
+    row.innerHTML = "";
+    (page.tags || []).forEach((t) => {
+      row.appendChild(h("span", { class: "page-tag" },
+        h("span", { onclick: () => navigate("tags", t), style: "cursor:pointer" }, "#" + t),
+        h("button", { class: "pt-remove", title: "Remover", onclick: () => { page.tags = page.tags.filter((x) => x !== t); updatePage(page.id, { tags: page.tags }); paint(); } }, "×")));
+    });
+    const addBtn = h("button", { class: "page-tag-add" }, "＋ tag");
+    addBtn.onclick = () => {
+      const input = h("input", { class: "page-tag-input", placeholder: "tag…" });
+      row.replaceChild(input, addBtn);
+      input.focus();
+      const done = (save) => {
+        const val = input.value.trim().replace(/^#/, "").replace(/\s+/g, "-").toLowerCase();
+        if (save && val && !(page.tags || []).includes(val)) {
+          page.tags = [...(page.tags || []), val];
+          updatePage(page.id, { tags: page.tags });
+        }
+        paint();
+      };
+      input.onkeydown = (e) => { if (e.key === "Enter") done(true); if (e.key === "Escape") done(false); };
+      input.onblur = () => done(true);
+    };
+    row.appendChild(addBtn);
+  };
+  paint();
+  return row;
+}
+
 /* ═══════════ Capa (banner) ═══════════ */
 function renderCover(page) {
   const el = h("div", { class: "page-cover" },
@@ -658,6 +696,84 @@ function renderToc() {
   build();
   el.rebuild = build;
   return el;
+}
+
+/* ═══════════ Bloco de gráfico (a partir de uma database) ═══════════ */
+function renderChart(block) {
+  const wrap = h("div", { class: "block-chart", style: "flex:1;min-width:0" });
+  const cfg = block.props || {};
+  const db = cfg.dbId ? getDatabase(cfg.dbId) : null;
+  const prop = db?.properties.find((p) => p.id === cfg.propId && p.type === "select");
+
+  const configBar = h("div", { class: "chart-config" });
+  const dbSel = h("select", { class: "input", style: "width:auto" });
+  dbSel.appendChild(h("option", { value: "" }, "— database —"));
+  listDatabases().forEach((d) => dbSel.appendChild(h("option", { value: d.id, selected: d.id === cfg.dbId || null }, d.name)));
+  const propSel = h("select", { class: "input", style: "width:auto" });
+  const fillProps = (d) => {
+    propSel.innerHTML = "";
+    propSel.appendChild(h("option", { value: "" }, "— agrupar por —"));
+    (d?.properties || []).filter((p) => p.type === "select").forEach((p) => propSel.appendChild(h("option", { value: p.id, selected: p.id === cfg.propId || null }, p.name)));
+  };
+  fillProps(db);
+  dbSel.onchange = () => { block.props = { ...block.props, dbId: dbSel.value, propId: "" }; commit({ structural: true }); };
+  propSel.onchange = () => { block.props = { ...block.props, propId: propSel.value }; commit({ structural: true }); };
+  const kindBtn = h("button", { class: "btn ghost sm", title: "Tipo",
+    onclick: () => { block.props = { ...block.props, kind: (cfg.kind === "pie" ? "bar" : "pie") }; commit({ structural: true }); } },
+    cfg.kind === "pie" ? "◔ Pizza" : "▮ Barras");
+  configBar.append(dbSel, propSel, kindBtn);
+  wrap.appendChild(configBar);
+
+  if (!db || !prop) {
+    wrap.appendChild(h("div", { class: "chart-empty" }, "Escolha uma database e uma propriedade Select para montar o gráfico."));
+    return wrap;
+  }
+
+  // conta linhas por opção
+  const counts = (prop.options || []).map((o) => ({ o, n: db.rows.filter((r) => r.values[prop.id] === o.id).length }));
+  const none = db.rows.filter((r) => !prop.options.some((o) => o.id === r.values[prop.id])).length;
+  if (none) counts.push({ o: { name: "Sem valor", color: "gray" }, n: none });
+  const total = counts.reduce((a, b) => a + b.n, 0) || 1;
+
+  wrap.appendChild(h("div", { class: "chart-title" }, `${db.name} · por ${prop.name} (${total})`));
+  if (cfg.kind === "pie") wrap.appendChild(pieChart(counts, total));
+  else wrap.appendChild(barChart(counts, total));
+  return wrap;
+}
+
+const CHART_HSL = { gray: "215 12% 55%", slate: "215 28% 50%", blue: "214 84% 56%", green: "148 55% 46%", amber: "36 90% 52%", red: "4 74% 57%", purple: "268 60% 58%", teal: "176 62% 44%" };
+const colHsl = (c) => `hsl(${CHART_HSL[c] || CHART_HSL.gray})`;
+
+function barChart(counts, total) {
+  const max = Math.max(...counts.map((c) => c.n), 1);
+  const rows = h("div", { class: "chart-bars" });
+  counts.forEach(({ o, n }) => {
+    rows.appendChild(h("div", { class: "cb-row" },
+      h("div", { class: "cb-label" }, o.name),
+      h("div", { class: "cb-track" }, h("div", { class: "cb-fill", style: `width:${(n / max) * 100}%;background:${colHsl(o.color)}` })),
+      h("div", { class: "cb-val" }, String(n))));
+  });
+  return rows;
+}
+function pieChart(counts, total) {
+  const NS = "http://www.w3.org/2000/svg";
+  const svg = document.createElementNS(NS, "svg");
+  svg.setAttribute("viewBox", "0 0 42 42"); svg.setAttribute("class", "chart-pie");
+  let acc = 0;
+  counts.filter((c) => c.n).forEach(({ o, n }) => {
+    const frac = n / total;
+    const c = document.createElementNS(NS, "circle");
+    c.setAttribute("cx", "21"); c.setAttribute("cy", "21"); c.setAttribute("r", "15.915");
+    c.setAttribute("fill", "none"); c.setAttribute("stroke", colHsl(o.color)); c.setAttribute("stroke-width", "8");
+    c.setAttribute("stroke-dasharray", `${(frac * 100).toFixed(2)} ${(100 - frac * 100).toFixed(2)}`);
+    c.setAttribute("stroke-dashoffset", String(25 - acc * 100));
+    svg.appendChild(c);
+    acc += frac;
+  });
+  const legend = h("div", { class: "chart-legend" });
+  counts.filter((c) => c.n).forEach(({ o, n }) => legend.appendChild(
+    h("span", { class: "cl-item" }, h("span", { class: "cl-dot", style: `background:${colHsl(o.color)}` }), `${o.name} · ${n}`)));
+  return h("div", { class: "chart-pie-wrap" }, svg, legend);
 }
 
 /* ═══════════ Imagens ═══════════ */

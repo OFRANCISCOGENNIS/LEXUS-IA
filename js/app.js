@@ -15,6 +15,8 @@ async function boot() {
   registerRoute("db", () => import("./modules/database.js"));
   registerRoute("daily", () => import("./modules/daily.js"));
   registerRoute("productivity", () => import("./modules/productivity.js"));
+  registerRoute("tasks", () => import("./modules/tasks.js"));
+  registerRoute("tags", () => import("./modules/tags.js"));
   registerRoute("graph", () => import("./modules/graph.js"));
   registerRoute("settings", () => import("./modules/settings.js"));
   registerRoute("templates", () => import("./modules/templates.js"));
