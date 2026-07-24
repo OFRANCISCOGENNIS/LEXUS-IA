@@ -35,6 +35,9 @@ async function boot() {
   initReminders();
   initRouter(document.getElementById("view"));
 
+  // retoma sessão de sincronização (se configurada) sem bloquear o boot
+  import("./core/sync.js").then((s) => s.initSync().catch(() => {})).catch(() => {});
+
   document.getElementById("app").classList.add("anim-fade");
 }
 

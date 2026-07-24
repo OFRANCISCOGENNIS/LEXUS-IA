@@ -388,3 +388,17 @@
 .agenda-ev:hover { background: var(--surface-hover); }
 .agenda-ev .ce-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
 .ae-kind { font-style: normal; }
+
+/* ═══════════════ Conta & Sincronização ═══════════════ */
+.sync-status { display: inline-flex; align-items: center; gap: 8px; font-size: var(--fs-sm); font-weight: 600; }
+.sync-status .sync-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--text-faint); }
+.sync-status.sync-ready { color: var(--ok); } .sync-ready .sync-dot { background: var(--ok); box-shadow: 0 0 0 3px var(--ok-soft); }
+.sync-status.sync-syncing { color: var(--accent-text); } .sync-syncing .sync-dot { background: var(--accent); animation: nx-pulse 1s infinite; }
+.sync-status.sync-error { color: var(--danger); } .sync-error .sync-dot { background: var(--danger); }
+.sync-status.sync-locked { color: var(--warn); } .sync-locked .sync-dot { background: var(--warn); }
+.sync-email { color: var(--text-3); font-weight: 500; font-size: var(--fs-xs); }
+.sync-setup { margin-bottom: var(--sp-3); font-size: var(--fs-sm); }
+.sync-setup summary { cursor: pointer; color: var(--accent-text); font-weight: 550; padding: 4px 0; }
+.sync-steps { margin: 8px 0 0 18px; display: flex; flex-direction: column; gap: 8px; font-size: var(--fs-sm); color: var(--text-2); }
+.sync-sql { background: var(--code-bg); border: 1px solid var(--border); border-radius: var(--r-sm); padding: 10px; font-family: var(--font-mono); font-size: 11px; white-space: pre-wrap; overflow-x: auto; margin: 4px 0; }
+.settings .btn-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 6px; }
