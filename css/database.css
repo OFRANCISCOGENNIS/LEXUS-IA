@@ -173,3 +173,52 @@ tr:hover .row-menu-btn { opacity: 1; }
   font-size: var(--fs-sm); outline: none;
   box-shadow: 0 0 0 3px var(--accent-soft);
 }
+
+/* ═══════════════ Views: Galeria · Lista · Calendário · Agrupamento ═══════════════ */
+
+/* Galeria */
+.db-gallery {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: var(--sp-4); padding: var(--sp-1) 0;
+}
+.gallery-card { overflow: hidden; cursor: pointer; }
+.gc-cover { height: 130px; background: var(--surface-2); overflow: hidden; display: flex; align-items: center; justify-content: center; }
+.gc-cover img { width: 100%; height: 100%; object-fit: cover; }
+.gc-cover.gc-empty { font-size: 32px; opacity: .3; }
+.gc-body { padding: var(--sp-3); }
+.gc-title { font-weight: 570; font-size: var(--fs-sm); margin-bottom: 6px; }
+.gc-meta { display: flex; flex-wrap: wrap; gap: 4px; }
+
+/* Lista */
+.db-list { padding: 4px; }
+.db-list-item {
+  display: flex; align-items: center; gap: var(--sp-3);
+  padding: 9px 12px; border-radius: var(--r-sm);
+  transition: background var(--t-fast); cursor: pointer;
+}
+.db-list-item:hover { background: var(--surface-hover); }
+.dl-title { font-weight: 550; font-size: var(--fs-sm); flex-shrink: 0; }
+.dl-meta { display: flex; flex-wrap: wrap; gap: 4px; flex: 1; justify-content: flex-end; }
+
+/* Calendário */
+.cal-head { display: flex; align-items: center; gap: var(--sp-2); margin-bottom: var(--sp-3); }
+.cal-month { font-weight: 640; font-size: var(--fs-lg); }
+.cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 1px; background: var(--border); border: 1px solid var(--border); border-radius: var(--r-md); overflow: hidden; }
+.cal-dow { background: var(--surface-2); padding: 6px; text-align: center; font-size: var(--fs-xs); font-weight: 600; color: var(--text-3); }
+.cal-cell { background: var(--surface); min-height: 96px; padding: 5px; display: flex; flex-direction: column; gap: 3px; }
+.cal-cell.empty { background: var(--surface-2); }
+.cal-cell.today { background: var(--accent-softer); }
+.cal-daynum { font-size: var(--fs-xs); color: var(--text-3); font-weight: 600; }
+.cal-cell.today .cal-daynum { color: var(--accent-text); }
+.cal-event {
+  font-size: 11px; text-align: left; padding: 2px 6px; border-radius: 4px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  background: var(--surface-active); color: var(--text-2);
+}
+.cal-event:hover { filter: brightness(0.97); }
+.cal-more { font-size: 10px; color: var(--text-faint); padding-left: 4px; }
+
+/* Agrupamento na tabela */
+.db-group-row td { background: var(--surface-2); padding: 0 !important; }
+.db-group-head { display: flex; align-items: center; gap: var(--sp-2); padding: 7px 12px; }
+.db-group-count { color: var(--text-faint); font-size: var(--fs-xs); font-weight: 600; }

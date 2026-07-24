@@ -5,7 +5,7 @@ import {
   getSetting, setSetting,
 } from "../core/store.js";
 import { navigate } from "../core/router.js";
-import { h, uid, escapeHtml, fmtDate, flip, download, debounce } from "../core/utils.js";
+import { h, uid, escapeHtml, fmtDate, flip, download, debounce, todayKey } from "../core/utils.js";
 import { showMenu, closeMenus, toast, confirmDialog, promptDialog, emojiPicker } from "../core/ui.js";
 
 const PROP_TYPES = [
@@ -108,13 +108,16 @@ function render() {
       class: "db-tab" + (v.id === state.viewId ? " active" : ""),
       onclick: () => { state.viewId = v.id; setSetting("dbView:" + db.id, v.id); render(); },
       oncontextmenu: (e) => { e.preventDefault(); viewMenu(e, v); },
-    }, h("span", {}, v.type === "kanban" ? "▥" : "▤"), h("span", {}, v.name)));
+    }, h("span", {}, VIEW_ICON[v.type] || "▤"), h("span", {}, v.name)));
   });
   tabs.appendChild(h("button", {
     class: "db-tab", title: "Nova view",
     onclick: (e) => showMenu(e.currentTarget, [
       { icon: "▤", title: "Tabela", action: () => addView("table") },
       { icon: "▥", title: "Kanban", action: () => addView("kanban") },
+      { icon: "▦", title: "Galeria", action: () => addView("gallery") },
+      { icon: "☰", title: "Lista", action: () => addView("list") },
+      { icon: "📅", title: "Calendário", action: () => addView("calendar") },
     ]),
   }, "＋"));
 
@@ -124,8 +127,14 @@ function render() {
   const filterBtn = h("button", { class: "btn ghost sm", onclick: (e) => filterMenu(e) },
     "⛃ Filtrar" + (activeFilterLabel() ? ` · ${activeFilterLabel()}` : ""));
 
-  wrap.appendChild(h("div", { class: "db-toolbar" }, tabs,
-    h("div", { class: "db-toolbar-right" }, filterBtn, quick)));
+  const rightSide = h("div", { class: "db-toolbar-right" }, filterBtn);
+  if (currentView().type === "table") {
+    const gp = currentView().groupBy ? db.properties.find((p) => p.id === currentView().groupBy) : null;
+    rightSide.appendChild(h("button", { class: "btn ghost sm", onclick: (e) => groupMenu(e) },
+      "⊞ Agrupar" + (gp ? ` · ${gp.name}` : "")));
+  }
+  rightSide.appendChild(quick);
+  wrap.appendChild(h("div", { class: "db-toolbar" }, tabs, rightSide));
 
   const viewport = h("div", { class: "db-viewport" });
   state.viewportEl = viewport;
@@ -149,10 +158,14 @@ function viewMenu(e, view) {
   ]);
 }
 
+const VIEW_ICON = { table: "▤", kanban: "▥", gallery: "▦", list: "☰", calendar: "📅" };
+const VIEW_NAME = { table: "Tabela", kanban: "Kanban", gallery: "Galeria", list: "Lista", calendar: "Calendário" };
+
 function addView(type) {
   const { db } = state;
   const groupBy = type === "kanban" ? db.properties.find((p) => p.type === "select")?.id || null : null;
-  const v = { id: uid("v"), name: type === "kanban" ? "Kanban" : "Tabela", type, filters: [], sorts: [], groupBy };
+  const dateProp = type === "calendar" ? db.properties.find((p) => p.type === "date")?.id || null : null;
+  const v = { id: uid("v"), name: VIEW_NAME[type] || "View", type, filters: [], sorts: [], groupBy, dateProp };
   db.views.push(v);
   state.viewId = v.id;
   commit(); render();
@@ -238,8 +251,146 @@ function renderView() {
   vp.innerHTML = "";
   const el = h("div", { class: "db-view-anim" });
   if (view.type === "kanban") renderKanban(el);
+  else if (view.type === "gallery") renderGallery(el);
+  else if (view.type === "list") renderList(el);
+  else if (view.type === "calendar") renderCalendar(el);
   else renderTable(el);
   vp.appendChild(el);
+}
+
+/* rótulo curto de uma propriedade para cards (chip/data/texto) */
+function propBadge(row, p) {
+  const v = row.values[p.id];
+  if (v == null || v === "" || (Array.isArray(v) && !v.length)) return null;
+  if (p.type === "select") {
+    const o = p.options?.find((o) => o.id === v);
+    return o ? h("span", { class: chipClass(o.color) }, o.name) : null;
+  }
+  if (p.type === "multiselect") {
+    const wrap = h("span", { style: "display:inline-flex;gap:4px;flex-wrap:wrap" });
+    v.slice(0, 4).forEach((id) => { const o = p.options?.find((o) => o.id === id); if (o) wrap.appendChild(h("span", { class: chipClass(o.color) }, o.name)); });
+    return wrap;
+  }
+  if (p.type === "date") return h("span", { class: "chip" }, "📅 " + fmtDate(v + "T12:00:00", { day: "numeric", month: "short" }));
+  if (p.type === "checkbox") return v ? h("span", { class: "chip c-green" }, "✓ " + p.name) : null;
+  if (p.type === "url") return h("a", { href: /^https?:/i.test(v) ? v : "https://" + v, target: "_blank", rel: "noopener", onclick: (e) => e.stopPropagation() }, String(v));
+  if (p.type === "number") return h("span", { class: "chip" }, Number(v).toLocaleString("pt-BR"));
+  return h("span", { style: "color:var(--text-3);font-size:var(--fs-xs)" }, String(v));
+}
+
+/* ═══════════ GALERIA ═══════════ */
+function renderGallery(root) {
+  const { db } = state;
+  const rows = visibleRows();
+  if (!rows.length) return emptyView(root, "▦", "Sem itens para exibir.");
+  const grid = h("div", { class: "db-gallery" });
+  rows.forEach((row) => {
+    const card = h("div", { class: "gallery-card card hoverable", dataset: { rowId: row.id } });
+    const cover = firstImage(row);
+    if (cover) card.appendChild(h("div", { class: "gc-cover" }, h("img", { src: cover, alt: "" })));
+    else card.appendChild(h("div", { class: "gc-cover gc-empty" }, h("span", {}, db.icon || "▦")));
+    const meta = h("div", { class: "gc-meta" });
+    db.properties.forEach((p) => { if (p.id !== "title") { const b = propBadge(row, p); if (b) meta.appendChild(b); } });
+    card.append(
+      h("div", { class: "gc-body" }, h("div", { class: "gc-title" }, row.values.title || "Sem nome"), meta));
+    card.addEventListener("dblclick", () => editTitle(row));
+    card.addEventListener("contextmenu", (e) => { e.preventDefault(); rowMenu({ currentTarget: card, stopPropagation() {}, clientX: e.clientX, clientY: e.clientY }, row); });
+    grid.appendChild(card);
+  });
+  root.appendChild(grid);
+  root.appendChild(newRowBtn());
+}
+function firstImage(row) {
+  for (const k in row.values) { const v = row.values[k]; if (typeof v === "string" && v.startsWith("data:image")) return v; }
+  return null;
+}
+
+/* ═══════════ LISTA ═══════════ */
+function renderList(root) {
+  const { db } = state;
+  const rows = visibleRows();
+  if (!rows.length) return emptyView(root, "☰", "Sem itens para exibir.");
+  const list = h("div", { class: "db-list card" });
+  rows.forEach((row) => {
+    const meta = h("div", { class: "dl-meta" });
+    db.properties.forEach((p) => { if (p.id !== "title") { const b = propBadge(row, p); if (b) meta.appendChild(b); } });
+    const item = h("div", { class: "db-list-item", dataset: { rowId: row.id } },
+      h("span", { class: "dl-title" }, row.values.title || "Sem nome"),
+      meta,
+      h("button", { class: "icon-btn row-menu-btn", "aria-label": "Opções", onclick: (e) => rowMenu(e, row) }, "⋯"));
+    item.addEventListener("dblclick", () => editTitle(row));
+    list.appendChild(item);
+  });
+  root.appendChild(list);
+  root.appendChild(newRowBtn());
+}
+
+/* ═══════════ CALENDÁRIO ═══════════ */
+let calMonth = null;
+function renderCalendar(root) {
+  const { db } = state;
+  const view = currentView();
+  let dateProp = db.properties.find((p) => p.id === view.dateProp && p.type === "date");
+  if (!dateProp) { dateProp = db.properties.find((p) => p.type === "date"); if (dateProp) { view.dateProp = dateProp.id; commit(); } }
+  if (!dateProp) return emptyView(root, "📅", "O calendário precisa de uma propriedade do tipo Data.");
+
+  if (!calMonth) calMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+  const rows = visibleRows();
+  const byDate = new Map();
+  rows.forEach((r) => { const d = r.values[dateProp.id]; if (d) { if (!byDate.has(d)) byDate.set(d, []); byDate.get(d).push(r); } });
+
+  const monthLabel = calMonth.toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
+  const head = h("div", { class: "cal-head" },
+    h("button", { class: "icon-btn", "aria-label": "Mês anterior", onclick: () => { calMonth = new Date(calMonth.getFullYear(), calMonth.getMonth() - 1, 1); renderView(); } }, "‹"),
+    h("span", { class: "cal-month" }, monthLabel[0].toUpperCase() + monthLabel.slice(1)),
+    h("button", { class: "icon-btn", "aria-label": "Próximo mês", onclick: () => { calMonth = new Date(calMonth.getFullYear(), calMonth.getMonth() + 1, 1); renderView(); } }, "›"),
+    h("button", { class: "btn ghost sm", style: "margin-left:8px", onclick: () => { calMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1); renderView(); } }, "Hoje"));
+
+  const grid = h("div", { class: "cal-grid" });
+  ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"].forEach((d) => grid.appendChild(h("div", { class: "cal-dow" }, d)));
+  const pad = calMonth.getDay();
+  for (let i = 0; i < pad; i++) grid.appendChild(h("div", { class: "cal-cell empty" }));
+  const days = new Date(calMonth.getFullYear(), calMonth.getMonth() + 1, 0).getDate();
+  const todayK = todayKey();
+  for (let day = 1; day <= days; day++) {
+    const key = todayKey(new Date(calMonth.getFullYear(), calMonth.getMonth(), day));
+    const cell = h("div", { class: "cal-cell" + (key === todayK ? " today" : "") });
+    cell.appendChild(h("div", { class: "cal-daynum" }, String(day)));
+    (byDate.get(key) || []).slice(0, 4).forEach((r) => {
+      const o = colorForRow(r);
+      cell.appendChild(h("button", {
+        class: "cal-event " + (o ? chipClass(o) : ""), title: r.values.title || "",
+        onclick: () => editTitle(r),
+      }, r.values.title || "Sem nome"));
+    });
+    const extra = (byDate.get(key) || []).length - 4;
+    if (extra > 0) cell.appendChild(h("div", { class: "cal-more" }, `+${extra}`));
+    // clique no dia cria registro com essa data
+    cell.addEventListener("dblclick", (e) => {
+      if (e.target !== cell && !e.target.classList.contains("cal-daynum")) return;
+      const row = makeRow(db, { title: "Novo evento", [dateProp.id]: key });
+      db.rows.push(row); commit(); renderView();
+    });
+    grid.appendChild(cell);
+  }
+  root.append(head, grid);
+}
+function colorForRow(row) {
+  const sel = state.db.properties.find((p) => p.type === "select" && row.values[p.id]);
+  if (!sel) return null;
+  return sel.options?.find((o) => o.id === row.values[sel.id])?.color || null;
+}
+
+function emptyView(root, icon, msg) {
+  root.appendChild(h("div", { class: "empty-state" }, h("div", { class: "es-icon" }, icon), h("div", { class: "es-desc" }, msg)));
+}
+function newRowBtn() {
+  return h("button", { class: "db-newrow", style: "border:1px solid var(--border);border-radius:var(--r-md);margin-top:10px", onclick: () => addRow() },
+    h("span", {}, "＋"), h("span", {}, "Novo registro"));
+}
+async function editTitle(row) {
+  const name = await promptDialog({ title: "Editar registro", value: row.values.title || "" });
+  if (name != null) { row.values.title = name; row.updatedAt = Date.now(); commit(); renderView(); }
 }
 
 /* ═══════════ TABELA ═══════════ */
@@ -273,8 +424,8 @@ function renderTable(root) {
   thead.appendChild(h("th", { class: "th-add" },
     h("button", { class: "th-add-btn", title: "Nova propriedade", onclick: (e) => addColumnMenu(e) }, "＋")));
 
-  const tbody = h("tbody", {});
-  rows.forEach((row) => {
+  const colCount = db.properties.length + 1;
+  const buildRow = (row) => {
     const tr = h("tr", { dataset: { rowId: row.id } });
     db.properties.forEach((p, pi) => {
       const td = h("td", {});
@@ -286,8 +437,24 @@ function renderTable(root) {
         class: "icon-btn row-menu-btn", "aria-label": "Opções da linha",
         onclick: (e) => rowMenu(e, row),
       }, "⋯")));
-    tbody.appendChild(tr);
-  });
+    return tr;
+  };
+
+  const tbody = h("tbody", {});
+  const groupProp = view.groupBy ? db.properties.find((p) => p.id === view.groupBy) : null;
+  if (groupProp) {
+    for (const g of groupRows(rows, groupProp)) {
+      const headTr = h("tr", { class: "db-group-row" });
+      headTr.appendChild(h("td", { colspan: colCount },
+        h("div", { class: "db-group-head" },
+          g.option ? h("span", { class: chipClass(g.option.color) }, g.option.name) : h("span", { class: "chip" }, "Sem valor"),
+          h("span", { class: "db-group-count" }, String(g.rows.length)))));
+      tbody.appendChild(headTr);
+      g.rows.forEach((row) => tbody.appendChild(buildRow(row)));
+    }
+  } else {
+    rows.forEach((row) => tbody.appendChild(buildRow(row)));
+  }
 
   root.appendChild(h("div", { class: "db-table-wrap" },
     h("table", { class: "db-table" }, h("thead", {}, thead), tbody),
@@ -301,6 +468,44 @@ function renderTable(root) {
         ? "Nada corresponde ao filtro atual."
         : "Sem linhas ainda — clique em “Nova linha”.")));
   }
+}
+
+/* agrupa linhas por uma propriedade select (ou checkbox) */
+function groupRows(rows, prop) {
+  const groups = [];
+  const index = new Map();
+  const ensure = (key, option) => {
+    if (!index.has(key)) { const g = { key, option, rows: [] }; index.set(key, g); groups.push(g); }
+    return index.get(key);
+  };
+  if (prop.type === "select") {
+    (prop.options || []).forEach((o) => ensure(o.id, o));
+    ensure("__none", null);
+    rows.forEach((r) => {
+      const v = r.values[prop.id];
+      const o = prop.options?.find((o) => o.id === v);
+      ensure(o ? o.id : "__none", o || null).rows.push(r);
+    });
+  } else if (prop.type === "checkbox") {
+    const yes = ensure("yes", { name: "Marcado", color: "green" });
+    const no = ensure("no", { name: "Não marcado", color: "gray" });
+    rows.forEach((r) => (r.values[prop.id] ? yes : no).rows.push(r));
+  } else {
+    rows.forEach((r) => ensure(String(r.values[prop.id] ?? "__none"), { name: String(r.values[prop.id] ?? "Sem valor"), color: "gray" }).rows.push(r));
+  }
+  return groups.filter((g) => g.rows.length);
+}
+
+function groupMenu(e) {
+  const view = currentView();
+  const items = [{ label: "Agrupar por" }];
+  state.db.properties.filter((p) => ["select", "checkbox"].includes(p.type)).forEach((p) => {
+    items.push({ icon: view.groupBy === p.id ? "✓" : "▤", title: p.name,
+      action: () => { view.groupBy = view.groupBy === p.id ? null : p.id; commit(); renderView(); } });
+  });
+  items.push({ sep: true });
+  items.push({ icon: "✕", title: "Não agrupar", action: () => { view.groupBy = null; commit(); renderView(); } });
+  showMenu(e.currentTarget, items);
 }
 
 function addRow(values = {}) {
