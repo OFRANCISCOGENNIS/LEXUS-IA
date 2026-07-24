@@ -92,10 +92,34 @@ export function renderSidebar() {
     ));
   });
 
-  // nav ativa
-  document.querySelectorAll(".sidebar [data-nav]").forEach((el) => {
+  // nav ativa (sidebar + barra inferior)
+  document.querySelectorAll(".sidebar [data-nav], .mobile-tabbar [data-nav]").forEach((el) => {
     el.classList.toggle("active", el.dataset.nav === route.name);
   });
+  // FAB só faz sentido em telas de navegação, não dentro do editor/db
+  const fab = document.getElementById("mobile-fab");
+  if (fab) fab.hidden = ["page", "db"].includes(route.name);
+}
+
+/* Gesto: deslizar da borda esquerda abre o drawer; deslizar sobre a sidebar fecha */
+function setupSwipe(app, setDrawer) {
+  let x0 = null, y0 = null, tracking = false;
+  addEventListener("touchstart", (e) => {
+    if (innerWidth > 720) return;
+    const t = e.touches[0];
+    x0 = t.clientX; y0 = t.clientY;
+    const open = app.classList.contains("drawer-open");
+    tracking = open || x0 < 24; // abre só a partir da borda
+  }, { passive: true });
+  addEventListener("touchend", (e) => {
+    if (!tracking || x0 == null) { x0 = null; return; }
+    const t = e.changedTouches[0];
+    const dx = t.clientX - x0, dy = t.clientY - y0;
+    if (Math.abs(dx) > 55 && Math.abs(dx) > Math.abs(dy) * 1.4) {
+      if (dx > 0) setDrawer(true); else setDrawer(false);
+    }
+    x0 = y0 = null; tracking = false;
+  }, { passive: true });
 }
 
 /* ── Breadcrumb ── */
@@ -170,16 +194,20 @@ export function initShell() {
   const setDrawer = (v) => app.classList.toggle("drawer-open", v);
   drawerToggle?.addEventListener("click", () => setDrawer(!app.classList.contains("drawer-open")));
   drawerScrim?.addEventListener("click", () => setDrawer(false));
+  document.getElementById("mtab-menu")?.addEventListener("click", () => setDrawer(!app.classList.contains("drawer-open")));
   // fecha o drawer ao navegar (no mobile a sidebar sobrepõe o conteúdo)
   bus.on("route:changed", () => setDrawer(false));
+
+  // gesto de deslizar para abrir/fechar o drawer
+  setupSwipe(app, setDrawer);
 
   // seções recolhíveis
   document.querySelectorAll("[data-toggle-section]").forEach((btn) => {
     btn.onclick = () => btn.closest(".sidebar-section").classList.toggle("collapsed");
   });
 
-  // navegação e ações
-  document.querySelectorAll(".sidebar [data-nav]").forEach((el) => {
+  // navegação e ações (sidebar + barra inferior mobile)
+  document.querySelectorAll(".sidebar [data-nav], .mobile-tabbar [data-nav]").forEach((el) => {
     el.addEventListener("click", () => navigate(el.dataset.nav));
   });
   document.querySelectorAll("[data-action]").forEach((el) => {

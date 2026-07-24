@@ -127,6 +127,26 @@
       <main id="view" class="view" tabindex="-1"></main>
     </div>
     <div id="drawer-scrim" class="drawer-scrim"></div>
+
+    <!-- ══════════ Barra de navegação inferior (mobile) ══════════ -->
+    <nav id="mobile-tabbar" class="mobile-tabbar mobile-only" aria-label="Navegação inferior">
+      <button class="mtab" data-nav="home" aria-label="Início">
+        <span class="mtab-icon">⌂</span><span class="mtab-label">Início</span>
+      </button>
+      <button class="mtab" data-action="open-palette" aria-label="Buscar">
+        <span class="mtab-icon">⌕</span><span class="mtab-label">Buscar</span>
+      </button>
+      <button class="mtab" data-nav="tasks" aria-label="Tarefas">
+        <span class="mtab-icon">✓</span><span class="mtab-label">Tarefas</span>
+      </button>
+      <button class="mtab" data-nav="daily" aria-label="Diário">
+        <span class="mtab-icon">☀</span><span class="mtab-label">Diário</span>
+      </button>
+      <button class="mtab" id="mtab-menu" aria-label="Menu">
+        <span class="mtab-icon">☰</span><span class="mtab-label">Menu</span>
+      </button>
+    </nav>
+    <button id="mobile-fab" class="mobile-fab mobile-only" aria-label="Nova página" data-action="new-page">＋</button>
   </div>
 
   <!-- Overlays raiz (palette, modais, toasts, menus) -->
