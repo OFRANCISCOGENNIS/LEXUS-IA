@@ -63,7 +63,7 @@ Databases: `listDatabases()`, `getDatabase(id)`, `createDatabase(partial)`, `upd
 Database: `{id, name, icon, properties[], rows[], views[], automations[]}`.
 Property: `{id, name, type, options?, targetDbId?, relationPropId?, targetPropId?, agg?, formula?}` — types: `title text number select multiselect date checkbox url formula relation rollup`.
 `title` é a property fixa id="title". Select option: `{id, name, color}` (colors: gray blue green amber red purple).
-Row: `{id, values: {propId: valor}, createdAt, updatedAt}` — select guarda option.id; multiselect/relation array de ids; date "YYYY-MM-DD"; checkbox bool.
+Row: `{id, values: {propId: valor}, parentId?, createdAt, updatedAt}` — select guarda option.id; multiselect/relation array de ids; date "YYYY-MM-DD"; checkbox bool. `parentId` aninha sub-itens (só a view de tabela expande/recolhe; excluir o pai remove os descendentes).
 View: `{id, name, type:"table"|"kanban"|"gallery"|"list"|"calendar"|"timeline", filters[], sorts[], groupBy, dateProp?, filterGroup?, startProp?, endProp?, depProp?}`.
 Timeline/Gantt usa `startProp`/`endProp` (data) para barras arrastáveis/redimensionáveis e `depProp` (relação auto-referente) para conectores de dependência.
 Automação: `{id, name, enabled, trigger:{type:"propChanged"|"rowCreated", propId?, toValue?}, actions:[{type:"setProp"|"notify", propId?, value?, message?}]}` — executadas 100% locais em `runAutomations()` ao editar célula, mover no kanban ou criar linha.

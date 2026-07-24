@@ -318,3 +318,13 @@ tr:hover .row-menu-btn { opacity: 1; }
 .auto-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .auto-arrow { color: var(--text-faint); font-weight: 700; }
 .auto-actions { display: flex; flex-direction: column; gap: 8px; }
+
+/* ═══════════════ SUB-ITENS (tabela) ═══════════════ */
+.row-expand {
+  flex: none; width: 16px; height: 16px; margin-right: 2px; padding: 0;
+  display: inline-flex; align-items: center; justify-content: center;
+  border: 0; background: transparent; cursor: pointer; border-radius: 4px;
+  color: var(--text-faint); font-size: 10px; line-height: 1;
+}
+.row-expand:hover { background: var(--surface-active); color: var(--text-2); }
+.row-expand.empty { pointer-events: none; visibility: hidden; }

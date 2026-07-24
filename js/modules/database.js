@@ -40,6 +40,7 @@ export default {
       db, container,
       viewId: db.views.find((v) => v.id === savedView)?.id || db.views[0]?.id,
       quickFilter: "",
+      expanded: new Set(),
     };
     render();
     setupTopbar(db);
@@ -548,11 +549,29 @@ function renderTable(root) {
     h("button", { class: "th-add-btn", title: "Nova propriedade", onclick: (e) => addColumnMenu(e) }, "＋")));
 
   const colCount = db.properties.length + 1;
-  const buildRow = (row) => {
+  const childrenOf = (id) => db.rows.filter((r) => r.parentId === id);
+  const buildRow = (row, depth = 0) => {
     const tr = h("tr", { dataset: { rowId: row.id } });
     db.properties.forEach((p, pi) => {
       const td = h("td", {});
-      td.appendChild(renderCell(row, p, pi === 0));
+      const cell = renderCell(row, p, pi === 0);
+      if (pi === 0) {
+        const kids = childrenOf(row.id);
+        const open = state.expanded.has(row.id);
+        const caret = h("button", {
+          class: "row-expand" + (kids.length ? "" : " empty"),
+          title: kids.length ? (open ? "Recolher" : `Expandir (${kids.length})`) : "",
+          onclick: (e) => {
+            e.stopPropagation();
+            if (!kids.length) return;
+            open ? state.expanded.delete(row.id) : state.expanded.add(row.id);
+            renderView();
+          },
+        }, kids.length ? (open ? "▾" : "▸") : "");
+        cell.style.paddingLeft = (6 + depth * 18) + "px";
+        cell.insertBefore(caret, cell.firstChild);
+      }
+      td.appendChild(cell);
       tr.appendChild(td);
     });
     tr.appendChild(h("td", { style: "min-width:40px;text-align:center" },
@@ -562,21 +581,27 @@ function renderTable(root) {
       }, "⋯")));
     return tr;
   };
+  // renderiza uma linha e, se expandida, seus sub-itens recursivamente
+  const appendTree = (tbody, row, depth) => {
+    tbody.appendChild(buildRow(row, depth));
+    if (state.expanded.has(row.id)) childrenOf(row.id).forEach((c) => appendTree(tbody, c, depth + 1));
+  };
 
   const tbody = h("tbody", {});
+  const topRows = rows.filter((r) => !r.parentId); // sub-itens aninham sob os pais
   const groupProp = view.groupBy ? db.properties.find((p) => p.id === view.groupBy) : null;
   if (groupProp) {
-    for (const g of groupRows(rows, groupProp)) {
+    for (const g of groupRows(topRows, groupProp)) {
       const headTr = h("tr", { class: "db-group-row" });
       headTr.appendChild(h("td", { colspan: colCount },
         h("div", { class: "db-group-head" },
           g.option ? h("span", { class: chipClass(g.option.color) }, g.option.name) : h("span", { class: "chip" }, "Sem valor"),
           h("span", { class: "db-group-count" }, String(g.rows.length)))));
       tbody.appendChild(headTr);
-      g.rows.forEach((row) => tbody.appendChild(buildRow(row)));
+      g.rows.forEach((row) => appendTree(tbody, row, 0));
     }
   } else {
-    rows.forEach((row) => tbody.appendChild(buildRow(row)));
+    topRows.forEach((row) => appendTree(tbody, row, 0));
   }
 
   root.appendChild(h("div", { class: "db-table-wrap" },
@@ -643,16 +668,38 @@ function addRow(values = {}) {
 function rowMenu(e, row) {
   e.stopPropagation();
   showMenu(e.currentTarget, [
+    { icon: "↳", title: "Adicionar sub-item", action: () => {
+      const child = makeRow(state.db, {});
+      child.parentId = row.id;
+      state.db.rows.splice(state.db.rows.indexOf(row) + 1, 0, child);
+      state.expanded.add(row.id);
+      commit();
+      runAutomations(child, { kind: "rowCreated" });
+      renderView();
+    } },
     { icon: "⧉", title: "Duplicar", action: () => {
       const copy = makeRow(state.db, structuredClone(row.values));
+      copy.parentId = row.parentId;
       state.db.rows.splice(state.db.rows.indexOf(row) + 1, 0, copy);
       commit(); renderView();
     } },
-    { icon: "🗑", title: "Excluir linha", danger: true, action: () => {
-      state.db.rows = state.db.rows.filter((r) => r.id !== row.id);
+    { icon: "🗑", title: "Excluir linha" + (descendantsOf(row.id).length ? " e sub-itens" : ""), danger: true, action: () => {
+      const kill = new Set([row.id, ...descendantsOf(row.id)]);
+      state.db.rows = state.db.rows.filter((r) => !kill.has(r.id));
       commit(); renderView();
     } },
   ]);
+}
+
+/* ids de todos os descendentes (sub-itens em qualquer profundidade) */
+function descendantsOf(rowId) {
+  const out = [];
+  const stack = [rowId];
+  while (stack.length) {
+    const id = stack.pop();
+    state.db.rows.forEach((r) => { if (r.parentId === id) { out.push(r.id); stack.push(r.id); } });
+  }
+  return out;
 }
 
 function columnMenu(e, prop) {

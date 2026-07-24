@@ -12,7 +12,7 @@ import { bus } from "../core/bus.js";
 import { navigate } from "../core/router.js";
 import {
   h, uid, debounce, sanitizeInline, stripHtml, escapeHtml, fuzzyScore, flip,
-  positionFloating, fmtRelative, readingTime, clamp,
+  positionFloating, fmtRelative, fmtDate, readingTime, clamp,
 } from "../core/utils.js";
 import { showMenu, closeMenus, toast, showModal, emojiPicker, confirmDialog, promptDialog } from "../core/ui.js";
 import { pageToMarkdown } from "../core/markdown.js";
@@ -424,13 +424,14 @@ function bindContent(content, block) {
     save();
     maybeSlashMenu(content, block);
     maybeWikiLink(content, block);
+    maybeMention(content, block);
     maybeMarkdownShortcut(content, block);
   });
 
   content.addEventListener("keydown", (e) => onBlockKeydown(e, content, block));
   content.addEventListener("paste", (e) => onPaste(e, content, block));
   content.addEventListener("click", (e) => {
-    const link = e.target.closest(".wiki-link");
+    const link = e.target.closest(".wiki-link, .mention-page");
     if (link) {
       e.preventDefault();
       const id = link.dataset.pageId;
@@ -441,7 +442,7 @@ function bindContent(content, block) {
 }
 
 function onBlockKeydown(e, content, block) {
-  if (slashState.open || wikiState.open) {
+  if (slashState.open || wikiState.open || mentionState.open) {
     if (["ArrowDown", "ArrowUp", "Enter", "Escape", "Tab"].includes(e.key)) return; // menus tratam
   }
 
@@ -1438,6 +1439,143 @@ function closeWiki() {
   wikiState.menu?.remove();
   wikiState.offKey?.();
   Object.assign(wikiState, { open: false, menu: null, block: null, contentEl: null, query: "" });
+}
+
+/* ═══════════ Menções @página · @data ═══════════ */
+const mentionState = { open: false, menu: null, block: null, contentEl: null, query: "" };
+
+function maybeMention(content, block) {
+  const before = textBeforeCaret(content);
+  const m = before.match(/(?:^|\s)@([^\s@]*)$/); // @ no início ou após espaço
+  if (m) {
+    mentionState.query = m[1];
+    if (!mentionState.open) openMentionMenu(content, block);
+    else refreshMentionMenu();
+  } else if (mentionState.open) closeMention();
+}
+
+function openMentionMenu(content, block) {
+  closeMention();
+  mentionState.open = true;
+  mentionState.block = block;
+  mentionState.contentEl = content;
+  const menu = h("div", { class: "menu", style: "min-width:260px" });
+  mentionState.menu = menu;
+  document.getElementById("overlay-root").appendChild(menu);
+  refreshMentionMenu();
+  const r = caretRange();
+  positionFloating(menu, r ? r.getBoundingClientRect() : content.getBoundingClientRect(), { gap: 8 });
+
+  const onKey = (e) => {
+    if (!mentionState.open) return;
+    if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); closeMention(); }
+    else if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+      e.preventDefault();
+      const items = [...menu.querySelectorAll(".menu-item")];
+      const cur = items.findIndex((x) => x.classList.contains("selected"));
+      const next = clamp(cur + (e.key === "ArrowDown" ? 1 : -1), 0, items.length - 1);
+      items.forEach((x, i) => x.classList.toggle("selected", i === next));
+      items[next]?.scrollIntoView({ block: "nearest" });
+    } else if (e.key === "Enter" || e.key === "Tab") {
+      e.preventDefault(); e.stopPropagation();
+      menu.querySelector(".menu-item.selected")?.click();
+    }
+  };
+  addEventListener("keydown", onKey, true);
+  mentionState.offKey = () => removeEventListener("keydown", onKey, true);
+  const onOutside = (ev) => { if (!menu.contains(ev.target)) closeMention(); };
+  setTimeout(() => addEventListener("pointerdown", onOutside, true), 0);
+  mentionState.offOutside = () => removeEventListener("pointerdown", onOutside, true);
+}
+
+function refreshMentionMenu() {
+  const { menu, query } = mentionState;
+  if (!menu) return;
+  menu.innerHTML = "";
+  const q = query.toLowerCase();
+  let idx = 0;
+  const item = (icon, title, desc, onclick) => {
+    const b = h("button", { class: "menu-item" + (idx === 0 ? " selected" : ""), onclick },
+      h("i", { class: "mi-icon" }, icon),
+      h("div", { class: "mi-body" }, h("div", { class: "mi-title" }, title), desc ? h("div", { class: "mi-desc" }, desc) : null));
+    menu.appendChild(b); idx++;
+  };
+
+  // ── Datas ──
+  const now = Date.now();
+  const dates = [
+    { label: "Hoje", date: new Date(now) },
+    { label: "Amanhã", date: new Date(now + 86400000) },
+    { label: "Ontem", date: new Date(now - 86400000) },
+  ].filter((d) => !q || fuzzyScore(q, d.label) >= 0 || "data".startsWith(q) || "date".startsWith(q));
+  if (dates.length) {
+    menu.appendChild(h("div", { class: "menu-label" }, "Data"));
+    dates.forEach((d) => item("📅", d.label, fmtDate(d.date.getTime()), () => insertDateMention(d.date)));
+  }
+
+  // ── Páginas ──
+  const pages = listPages()
+    .filter((p) => p.id !== state.page.id && !p.archived)
+    .map((p) => ({ p, s: query ? fuzzyScore(query, p.title || "") : 1 }))
+    .filter((x) => x.s >= 0)
+    .sort((a, b) => b.s - a.s)
+    .slice(0, 6);
+  if (pages.length) {
+    menu.appendChild(h("div", { class: "menu-label" }, "Páginas"));
+    pages.forEach(({ p }) => item(p.icon || "▢", p.title || "Sem título", "", () => insertPageMention(p)));
+  }
+
+  if (query) item("＋", `Criar “${query}”`, "", () => { const np = createPage({ title: query }); insertPageMention(np); });
+  if (!menu.querySelector(".menu-item")) menu.appendChild(h("div", { class: "palette-empty" }, "Sem resultados"));
+}
+
+/* Remove o gatilho (ex.: "@query") antes do caret e insere um nó no lugar */
+function replaceTriggerWithNode(contentEl, triggerChar, node) {
+  const sel = getSelection();
+  if (sel.rangeCount) {
+    const r = sel.getRangeAt(0);
+    const c = r.startContainer;
+    if (c.nodeType === Node.TEXT_NODE) {
+      const text = c.textContent.slice(0, r.startOffset);
+      const i = text.lastIndexOf(triggerChar);
+      if (i >= 0) { const del = document.createRange(); del.setStart(c, i); del.setEnd(c, r.startOffset); del.deleteContents(); }
+    }
+  }
+  const r2 = getSelection().getRangeAt(0);
+  r2.insertNode(node);
+  const space = document.createTextNode(" ");
+  node.after(space);
+  const after = document.createRange();
+  after.setStartAfter(space); after.collapse(true);
+  const s = getSelection(); s.removeAllRanges(); s.addRange(after);
+}
+
+function insertPageMention(page) {
+  const { contentEl, block } = mentionState;
+  closeMention();
+  contentEl.focus();
+  const span = h("span", { class: "mention mention-page", dataset: { pageId: page.id }, contenteditable: "false" },
+    "@" + (page.title || "Sem título"));
+  replaceTriggerWithNode(contentEl, "@", span);
+  block.content = sanitizeInline(contentEl.innerHTML);
+  commit();
+}
+
+function insertDateMention(date) {
+  const { contentEl, block } = mentionState;
+  closeMention();
+  contentEl.focus();
+  const span = h("span", { class: "mention mention-date", contenteditable: "false" }, "📅 " + fmtDate(date.getTime()));
+  replaceTriggerWithNode(contentEl, "@", span);
+  block.content = sanitizeInline(contentEl.innerHTML);
+  commit();
+}
+
+function closeMention() {
+  mentionState.menu?.remove();
+  mentionState.offKey?.();
+  mentionState.offOutside?.();
+  Object.assign(mentionState, { open: false, menu: null, block: null, contentEl: null, query: "" });
 }
 
 /* ═══════════ Atalhos markdown ═══════════ */
