@@ -10,15 +10,20 @@ O NEXUS é um workspace de produtividade estilo Notion/Craft/Capacities,
 
 | | |
 |---|---|
-| 📝 **Editor de blocos** | Slash menu (`/`), formatação inline, wiki-links `[[...]]` com backlinks, drag & drop com FLIP, histórico de versões com diff, modo foco |
-| ▦ **Databases** | Tabela e Kanban com drag & drop, propriedades tipadas (select, data, número, URL…), filtros, ordenação, export CSV |
+| 📝 **Editor de blocos** | Slash menu (`/`), formatação inline, wiki-links `[[...]]` com backlinks, drag & drop com FLIP, histórico de versões com diff, sumário (TOC), capas, tags, bloco de gráfico |
+| ✍ **Modo foco/máquina de escrever** | Isola o parágrafo atual, HUD com contador de palavras e meta de escrita, scroll centralizado |
+| ▦ **Databases** | Views Tabela, Kanban, Galeria, Lista e Calendário; propriedades select, data, número, URL, checkbox, **fórmula**; filtros, ordenação, agrupamento, export CSV |
+| ✓ **Tarefas & Projetos** | Agrega prazos das databases e checklists das páginas em Hoje/Semana/Atrasadas |
+| ◷ **Produtividade** | Pomodoro, hábitos com heatmap, lembretes locais |
+| 🏷 **Tags & Coleções** | Tags por página, páginas de tag automáticas e coleções inteligentes |
+| 🔐 **Privacidade** | Páginas privadas com PIN local, bloqueio somente-leitura, lixeira e arquivo |
+| 📱 **PWA + Mobile** | Instalável, offline após primeira carga, sidebar em drawer no celular |
+| ⎙ **Export** | Markdown, CSV, JSON e **PDF** (impressão limpa) |
 | ◉ **Grafo de conhecimento** | Grafo força-dirigido de todas as páginas e links, com pan/zoom e destaque de vizinhança |
 | ⌘K **Command palette** | Navegação, criação, comandos, busca universal com fuzzy matching |
 | ☀ **Daily notes** | Journal com calendário, streak, humor do dia |
-| ◷ **Produtividade** | Timer Pomodoro com estatísticas, rastreador de hábitos com heatmap e streaks, lembretes locais (notificações do navegador) |
-| 📱 **Mobile** | Layout responsivo com sidebar em drawer e telas adaptadas ao toque |
 | 🎨 **Personalização** | Claro/escuro/auto, 8 cores de acento, densidade, fonte, largura de página |
-| 💾 **Data ownership** | Export/import de backup JSON completo, export Markdown e CSV — tudo em IndexedDB no seu dispositivo |
+| 💾 **Data ownership** | Export/import de backup JSON completo — tudo em IndexedDB no seu dispositivo |
 
 ## 🚀 Rodando
 
