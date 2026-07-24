@@ -19,6 +19,7 @@ function commands() {
     { icon: "▦", title: "Nova database", kind: "Ação", run: () => newDatabase() },
     { icon: "☀", title: "Abrir nota de hoje", kind: "Ação", run: () => { getOrCreateDaily(); navigate("daily"); } },
     { icon: "✓", title: "Abrir Tarefas & Projetos", kind: "Navegar", run: () => navigate("tasks") },
+    { icon: "📅", title: "Abrir Calendário", kind: "Navegar", run: () => navigate("calendar") },
     { icon: "◷", title: "Abrir Produtividade (Pomodoro, Hábitos, Lembretes)", kind: "Navegar", run: () => navigate("productivity") },
     { icon: "🏷", title: "Abrir Tags & Coleções", kind: "Navegar", run: () => navigate("tags") },
     { icon: "🍅", title: "Iniciar Pomodoro", kind: "Ação", run: () => navigate("productivity") },

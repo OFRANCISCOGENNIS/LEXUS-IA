@@ -33,6 +33,17 @@ const BLOCK_DEFS = [
   { type: "callout", icon: "💡", title: "Callout", desc: "Destaque com ícone e cor", kw: "callout destaque aviso" },
   { type: "code", icon: "⌗", title: "Código", desc: "Bloco de código com highlight", kw: "codigo code snippet" },
   { type: "divider", icon: "—", title: "Divisor", desc: "Linha horizontal", kw: "divisor linha separador" },
+  { type: "callout", preset: "accent", icon: "ℹ", title: "Callout · Info", desc: "Destaque informativo (azul)", kw: "callout info aviso azul destaque" },
+  { type: "callout", preset: "warn", icon: "⚠", title: "Callout · Atenção", desc: "Aviso de atenção (âmbar)", kw: "callout atencao aviso amarelo ambar" },
+  { type: "callout", preset: "ok", icon: "✅", title: "Callout · Sucesso", desc: "Destaque de sucesso (verde)", kw: "callout sucesso verde ok" },
+  { type: "callout", preset: "danger", icon: "⛔", title: "Callout · Erro", desc: "Destaque de erro (vermelho)", kw: "callout erro perigo vermelho danger" },
+  { type: "table", icon: "▦", title: "Tabela", desc: "Tabela simples editável", kw: "tabela table grade planilha" },
+  { type: "progress", icon: "▰", title: "Progresso", desc: "Barra de progresso ajustável", kw: "progresso progress barra percentual meta" },
+  { type: "button", icon: "⬢", title: "Botão", desc: "Botão que abre página ou link", kw: "botao button link acao clique" },
+  { type: "subpage", icon: "⤷", title: "Sub-página", desc: "Cria uma página filha", kw: "subpagina pagina filha nova aninhada" },
+  { type: "video", icon: "🎬", title: "Vídeo", desc: "Vídeo local (upload)", kw: "video filme media clipe" },
+  { type: "audio", icon: "🎧", title: "Áudio", desc: "Áudio local (upload)", kw: "audio som media musica" },
+  { type: "bookmark", icon: "🔖", title: "Bookmark", desc: "Cartão de link para uma URL", kw: "bookmark link favorito url site" },
   { type: "toc", icon: "☰", title: "Sumário", desc: "Índice automático dos títulos", kw: "sumario toc indice tabela conteudo" },
   { type: "chart", icon: "📊", title: "Gráfico", desc: "Barras a partir de uma database", kw: "grafico chart barra kpi dashboard database" },
   { type: "image", icon: "🖼", title: "Imagem", desc: "Envie ou cole uma imagem", kw: "imagem foto image" },
@@ -328,6 +339,18 @@ function renderBlock(block, { num = 0, inToggle = false } = {}) {
   } else if (block.type === "chart") {
     el.appendChild(renderChart(block));
     el.tabIndex = -1;
+  } else if (block.type === "table") {
+    el.appendChild(renderTableBlock(block)); el.tabIndex = -1;
+  } else if (block.type === "progress") {
+    el.appendChild(renderProgress(block)); el.tabIndex = -1;
+  } else if (block.type === "button") {
+    el.appendChild(renderButton(block)); el.tabIndex = -1;
+  } else if (block.type === "subpage") {
+    el.appendChild(renderSubpage(block)); el.tabIndex = -1;
+  } else if (block.type === "video" || block.type === "audio") {
+    el.appendChild(renderMedia(block)); el.tabIndex = -1;
+  } else if (block.type === "bookmark") {
+    el.appendChild(renderBookmark(block)); el.tabIndex = -1;
   } else if (block.type === "image") {
     el.appendChild(renderImage(block));
   } else if (block.type === "code") {
@@ -821,6 +844,131 @@ function pieChart(counts, total) {
   return h("div", { class: "chart-pie-wrap" }, svg, legend);
 }
 
+/* ═══════════ Tabela inline ═══════════ */
+function renderTableBlock(block) {
+  block.props = block.props || {};
+  const data = block.props.data || (block.props.data = [["", ""], ["", ""]]);
+  const wrap = h("div", { class: "block-tableblock", style: "flex:1;min-width:0" });
+  const table = h("table", { class: "inline-table" });
+  data.forEach((row, ri) => {
+    const tr = h("tr", {});
+    row.forEach((cell, ci) => {
+      const td = h("td", {});
+      const c = h("div", { class: "it-cell", contenteditable: state.page.locked ? "false" : "true", html: sanitizeInline(cell || "") });
+      if (ri === 0) c.classList.add("it-head");
+      c.addEventListener("input", debounce(() => { data[ri][ci] = sanitizeInline(c.innerHTML); touchPageBlocks(state.page.id); }, 400));
+      td.appendChild(c); tr.appendChild(td);
+    });
+    table.appendChild(tr);
+  });
+  wrap.appendChild(table);
+  if (!state.page.locked) {
+    wrap.appendChild(h("div", { class: "it-actions" },
+      h("button", { class: "btn ghost sm", onclick: () => { data.forEach((r) => r.push("")); commit({ structural: true }); } }, "＋ coluna"),
+      h("button", { class: "btn ghost sm", onclick: () => { data.push(new Array(data[0].length).fill("")); commit({ structural: true }); } }, "＋ linha"),
+      h("button", { class: "btn ghost sm", onclick: () => { if (data[0].length > 1) { data.forEach((r) => r.pop()); commit({ structural: true }); } } }, "− coluna"),
+      h("button", { class: "btn ghost sm", onclick: () => { if (data.length > 1) { data.pop(); commit({ structural: true }); } } }, "− linha")));
+  }
+  return wrap;
+}
+
+/* ═══════════ Barra de progresso ═══════════ */
+function renderProgress(block) {
+  block.props = block.props || { value: 40 };
+  const wrap = h("div", { class: "block-progress", style: "flex:1;min-width:0" });
+  const label = h("div", { class: "prog-label", contenteditable: state.page.locked ? "false" : "true", "data-placeholder": "Rótulo…", html: sanitizeInline(block.props.label || "") });
+  label.addEventListener("input", debounce(() => { block.props.label = sanitizeInline(label.innerHTML); touchPageBlocks(state.page.id); }, 400));
+  const pct = h("span", { class: "prog-pct" }, (block.props.value || 0) + "%");
+  const range = h("input", { type: "range", min: "0", max: "100", value: String(block.props.value || 0), class: "prog-range", disabled: state.page.locked ? "" : null });
+  const fill = h("div", { class: "prog-fill", style: `width:${block.props.value || 0}%` });
+  range.addEventListener("input", () => { block.props.value = +range.value; pct.textContent = range.value + "%"; fill.style.width = range.value + "%"; });
+  range.addEventListener("change", () => touchPageBlocks(state.page.id));
+  wrap.append(
+    h("div", { class: "prog-head" }, label, pct),
+    h("div", { class: "prog-track" }, fill),
+    state.page.locked ? null : range);
+  return wrap;
+}
+
+/* ═══════════ Botão ═══════════ */
+function renderButton(block) {
+  block.props = block.props || {};
+  const a = block.props.action || (block.props.action = { type: "url", target: "" });
+  const btn = h("button", { class: "block-button" }, block.props.label || "Botão");
+  btn.onclick = () => {
+    if (a.type === "page" && a.target) navigate("page", a.target);
+    else if (a.type === "url" && a.target) open(/^https?:/i.test(a.target) ? a.target : "https://" + a.target, "_blank");
+    else if (!state.page.locked) configBtn();
+  };
+  const cog = state.page.locked ? null : h("button", { class: "icon-btn block-button-cfg", "aria-label": "Configurar", onclick: (e) => { e.stopPropagation(); configBtn(e.currentTarget); } }, "⚙");
+  function configBtn(anchor) {
+    showMenu(anchor || btn, [
+      { icon: "✎", title: "Editar rótulo", action: async () => { const l = await promptDialog({ title: "Rótulo do botão", value: block.props.label || "" }); if (l != null) { block.props.label = l; commit({ structural: true }); } } },
+      { icon: "🔗", title: "Abrir uma URL", action: async () => { const u = await promptDialog({ title: "URL", value: a.type === "url" ? a.target : "" }); if (u != null) { block.props.action = { type: "url", target: u }; commit({ structural: true }); } } },
+      { icon: "📄", title: "Abrir uma página", action: () => pickPageForButton(block) },
+    ]);
+  }
+  return h("div", { class: "block-button-wrap", style: "flex:1;min-width:0" }, btn, cog);
+}
+function pickPageForButton(block) {
+  const items = listPages().filter((p) => p.id !== state.page.id).slice(0, 20).map((p) => ({
+    icon: p.icon || "▢", title: p.title || "Sem título",
+    action: () => { block.props.action = { type: "page", target: p.id }; commit({ structural: true }); },
+  }));
+  showMenu(state.blocksEl.querySelector(`[data-block-id="${block.id}"] .block-button`), items.length ? items : [{ title: "Nenhuma outra página" }]);
+}
+
+/* ═══════════ Sub-página ═══════════ */
+function renderSubpage(block) {
+  const child = block.props?.pageId ? getPage(block.props.pageId) : null;
+  if (!child) return h("div", { class: "block-subpage broken" }, "⤷ Sub-página removida");
+  return h("button", { class: "block-subpage", style: "flex:1;min-width:0", onclick: () => navigate("page", child.id) },
+    h("span", { class: "sp-icon" }, child.icon || "📄"),
+    h("span", { class: "sp-title" }, child.title || "Sem título"),
+    h("span", { class: "sp-arrow" }, "›"));
+}
+
+/* ═══════════ Vídeo / Áudio local ═══════════ */
+function renderMedia(block) {
+  if (block.props?.src) {
+    const el = block.type === "video"
+      ? h("video", { src: block.props.src, controls: "", style: "width:100%;border-radius:var(--r-md)" })
+      : h("audio", { src: block.props.src, controls: "", style: "width:100%" });
+    return h("div", { class: "block-media", style: "flex:1;min-width:0" }, el);
+  }
+  return h("div", { class: "image-placeholder", style: "flex:1;min-width:0", onclick: () => pickMedia(block, block.type) },
+    h("span", {}, block.type === "video" ? "🎬" : "🎧"),
+    h("span", {}, `Clique para enviar um ${block.type === "video" ? "vídeo" : "áudio"} (fica no dispositivo)`));
+}
+function pickMedia(block, kind) {
+  const input = h("input", { type: "file", accept: kind + "/*", style: "display:none" });
+  input.addEventListener("change", () => {
+    const f = input.files[0]; if (!f) return;
+    if (f.size > 40 * 1024 * 1024) { toast("Arquivo grande demais (máx. 40MB para guardar localmente)", { type: "warn" }); return; }
+    const reader = new FileReader();
+    reader.onload = () => { block.props = { ...block.props, src: reader.result }; commit({ structural: true }); };
+    reader.readAsDataURL(f);
+  });
+  document.body.appendChild(input); input.click(); setTimeout(() => input.remove(), 1000);
+}
+
+/* ═══════════ Bookmark ═══════════ */
+function renderBookmark(block) {
+  const url = block.props?.url;
+  if (!url) {
+    return h("div", { class: "image-placeholder", style: "flex:1;min-width:0", onclick: async () => {
+      const u = await promptDialog({ title: "URL do bookmark", placeholder: "https://…" });
+      if (u) { block.props = { ...block.props, url: u }; commit({ structural: true }); }
+    } }, h("span", {}, "🔖"), h("span", {}, "Clique para colar um link"));
+  }
+  let host = url; try { host = new URL(/^https?:/i.test(url) ? url : "https://" + url).host; } catch {}
+  return h("a", { class: "block-bookmark card hoverable", href: /^https?:/i.test(url) ? url : "https://" + url, target: "_blank", rel: "noopener", style: "flex:1;min-width:0" },
+    h("span", { class: "bm-favicon" }, "🔖"),
+    h("div", { class: "bm-body" },
+      h("div", { class: "bm-host" }, host),
+      h("div", { class: "bm-url" }, url)));
+}
+
 /* ═══════════ Imagens ═══════════ */
 function renderImage(block) {
   if (block.props?.src) {
@@ -1008,15 +1156,42 @@ function applySlash(def) {
   const text = contentEl.innerHTML.replace(/\/[^\s/]*(\s|&nbsp;)?$/, "");
   block.content = sanitizeInline(text);
   block.type = def.type;
-  if (def.type === "callout") block.props = { icon: "💡", ...block.props };
+  if (def.type === "callout") block.props = { icon: def.preset === "warn" ? "⚠" : def.preset === "ok" ? "✅" : def.preset === "danger" ? "⛔" : def.preset === "accent" ? "ℹ" : "💡", color: def.preset || "", ...block.props };
   if (def.type === "code") block.props = { lang: "javascript", ...block.props };
+  if (def.type === "table") block.props = { data: [["", "", ""], ["", "", ""]] };
+  if (def.type === "progress") block.props = { value: 40, label: "" };
+  if (def.type === "button") block.props = { label: "Clique aqui", action: { type: "url", target: "" } };
+  if (def.type === "bookmark") block.props = { url: "" };
+  if (def.type === "subpage") {
+    const child = createPage({ title: "Sub-página", parentId: state.page.id });
+    block.props = { pageId: child.id };
+  }
   closeSlash();
+
+  // blocos não-textuais ganham um parágrafo em branco logo abaixo, para o fluxo continuar
+  const NEEDS_TRAILING = new Set(["table", "progress", "button", "subpage", "bookmark", "chart", "toc", "divider", "image", "video", "audio"]);
+  let trailingId = null;
+  if (NEEDS_TRAILING.has(def.type)) {
+    const found = findBlock(block.id);
+    if (found) {
+      const next = found.list[found.index + 1];
+      if (!next || next.type !== "p" || stripHtml(next.content).trim()) {
+        const nb = makeBlock();
+        found.list.splice(found.index + 1, 0, nb);
+        trailingId = nb.id;
+      } else trailingId = next.id;
+    }
+  }
+
   commit({ structural: true });
   if (TEXTUAL.has(def.type)) focusBlock(block.id, false);
   else if (def.type === "code") {
     const el = state.blocksEl.querySelector(`[data-block-id="${block.id}"] .block-content`);
     if (el) { el.textContent = block.content ? stripHtml(block.content) : ""; placeCaret(el, false); }
+  } else if (trailingId) {
+    focusBlock(trailingId, true);
   }
+  if (def.type === "video" || def.type === "audio") pickMedia(block, def.type);
 }
 
 function closeSlash() {
