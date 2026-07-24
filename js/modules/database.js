@@ -1,12 +1,12 @@
 // ═══════════════ NEXUS · Databases: Tabela + Kanban ═══════════════
 
 import {
-  getDatabase, updateDatabase, touchDatabase, deleteDatabase, makeRow,
+  getDatabase, updateDatabase, touchDatabase, deleteDatabase, makeRow, listDatabases,
   getSetting, setSetting,
 } from "../core/store.js";
 import { navigate } from "../core/router.js";
 import { h, uid, escapeHtml, fmtDate, flip, download, debounce, todayKey } from "../core/utils.js";
-import { showMenu, closeMenus, toast, confirmDialog, promptDialog, emojiPicker } from "../core/ui.js";
+import { showMenu, closeMenus, toast, confirmDialog, promptDialog, emojiPicker, showModal } from "../core/ui.js";
 
 const PROP_TYPES = [
   { type: "text", icon: "Aa", name: "Texto" },
@@ -17,6 +17,8 @@ const PROP_TYPES = [
   { type: "checkbox", icon: "☑", name: "Checkbox" },
   { type: "url", icon: "🔗", name: "URL" },
   { type: "formula", icon: "∑", name: "Fórmula" },
+  { type: "relation", icon: "⇄", name: "Relação" },
+  { type: "rollup", icon: "Σ", name: "Rollup" },
 ];
 const TYPE_ICON = Object.fromEntries(PROP_TYPES.map((t) => [t.type, t.icon]));
 TYPE_ICON.title = "T";
@@ -174,7 +176,10 @@ function addView(type) {
 
 /* ── Filtro simples (uma condição sobre select/checkbox) ── */
 function activeFilterLabel() {
-  const f = currentView().filters?.[0];
+  const view = currentView();
+  const nAdv = view.filterGroup?.conditions?.length || 0;
+  if (nAdv) return `${nAdv} ${nAdv === 1 ? "condição" : "condições"}`;
+  const f = view.filters?.[0];
   if (!f) return "";
   const p = state.db.properties.find((x) => x.id === f.propId);
   if (!p) return "";
@@ -198,8 +203,106 @@ function filterMenu(e) {
     }
   });
   items.push({ sep: true });
-  items.push({ icon: "✕", title: "Limpar filtro", action: () => { view.filters = []; commit(); render(); } });
+  items.push({ icon: "⛃", title: "Filtros avançados (E / OU)…", action: () => advancedFilterModal() });
+  items.push({ icon: "✕", title: "Limpar filtros", action: () => { view.filters = []; view.filterGroup = null; commit(); render(); } });
   showMenu(e.currentTarget, items);
+}
+
+/* ── Filtros avançados: múltiplas condições combinadas por E/OU ── */
+const OPERATORS = {
+  text: [["contains", "contém"], ["notcontains", "não contém"], ["eq", "é igual a"], ["empty", "vazio"], ["notempty", "não vazio"]],
+  number: [["eq", "="], ["gt", ">"], ["lt", "<"], ["neq", "≠"], ["empty", "vazio"]],
+  select: [["is", "é"], ["isnot", "não é"], ["empty", "vazio"]],
+  multiselect: [["is", "contém"], ["isnot", "não contém"]],
+  checkbox: [["checked", "marcado"], ["unchecked", "não marcado"]],
+  date: [["on", "em"], ["before", "antes de"], ["after", "depois de"], ["empty", "vazio"]],
+};
+const opsFor = (type) => OPERATORS[type] || (["url", "title"].includes(type) ? OPERATORS.text : OPERATORS.text);
+
+function matchCondition(row, cond, db) {
+  const p = db.properties.find((x) => x.id === cond.propId);
+  if (!p) return true;
+  const v = row.values[cond.propId];
+  const op = cond.operator;
+  const empty = v == null || v === "" || (Array.isArray(v) && !v.length);
+  if (op === "empty") return empty;
+  if (op === "notempty") return !empty;
+  const str = (x) => String(x ?? "").toLowerCase();
+  switch (p.type) {
+    case "select": return op === "isnot" ? v !== cond.value : v === cond.value;
+    case "multiselect": { const has = (v || []).includes(cond.value); return op === "isnot" ? !has : has; }
+    case "checkbox": return op === "unchecked" ? !v : !!v;
+    case "number": { const a = Number(v), b = Number(cond.value); if (op === "gt") return a > b; if (op === "lt") return a < b; if (op === "neq") return a !== b; return a === b; }
+    case "date": { const a = v || "", b = cond.value || ""; if (op === "before") return a && a < b; if (op === "after") return a && a > b; return a === b; }
+    default:
+      if (op === "eq") return str(v) === str(cond.value);
+      if (op === "notcontains") return !str(v).includes(str(cond.value));
+      return str(v).includes(str(cond.value));
+  }
+}
+
+function advancedFilterModal() {
+  const view = currentView();
+  const fg = view.filterGroup || (view.filterGroup = { op: "and", conditions: [] });
+  const filterable = state.db.properties.filter((p) => p.type !== "formula" && p.type !== "rollup" && p.type !== "relation");
+
+  const list = h("div", { class: "filter-conditions" });
+  const paint = () => {
+    list.innerHTML = "";
+    fg.conditions.forEach((c, i) => list.appendChild(conditionRow(c, i, filterable, paint)));
+    if (!fg.conditions.length) list.appendChild(h("div", { style: "color:var(--text-faint);font-size:var(--fs-sm);padding:8px 0" }, "Sem condições. Adicione uma abaixo."));
+  };
+
+  const opToggle = h("div", { class: "segmented", style: "width:fit-content" },
+    ...[["and", "Todas (E)"], ["or", "Qualquer (OU)"]].map(([v, l]) =>
+      h("button", { class: "seg-btn" + (fg.op === v ? " on" : ""), onclick: (e) => { fg.op = v; e.currentTarget.parentElement.querySelectorAll(".seg-btn").forEach((x) => x.classList.remove("on")); e.currentTarget.classList.add("on"); } }, l)));
+
+  const addBtn = h("button", { class: "btn ghost sm", onclick: () => { fg.conditions.push({ propId: filterable[0].id, operator: opsFor(filterable[0].type)[0][0], value: "" }); paint(); } }, "＋ condição");
+  const apply = h("button", { class: "btn primary" }, "Aplicar");
+  paint();
+
+  const m = showModal({
+    title: "Filtros avançados",
+    body: h("div", { style: "display:flex;flex-direction:column;gap:12px" },
+      h("div", { style: "display:flex;align-items:center;gap:10px" }, h("span", { style: "font-size:var(--fs-sm);color:var(--text-2)" }, "Combinar:"), opToggle),
+      list, addBtn),
+    footer: [h("button", { class: "btn ghost", onclick: () => { view.filterGroup = null; commit(); render(); m.close(); } }, "Limpar"), apply],
+    width: 560,
+  });
+  apply.onclick = () => { fg.conditions = fg.conditions.filter((c) => c.propId); commit(); render(); m.close(); };
+}
+
+function conditionRow(cond, idx, props, repaint) {
+  const propSel = h("select", { class: "input", style: "width:auto" });
+  props.forEach((p) => propSel.appendChild(h("option", { value: p.id, selected: p.id === cond.propId || null }, p.name)));
+  const opSel = h("select", { class: "input", style: "width:auto" });
+  const valHolder = h("span", { style: "flex:1;min-width:80px" });
+  const curProp = () => props.find((p) => p.id === propSel.value) || props[0];
+
+  const fillOps = () => {
+    opSel.innerHTML = "";
+    opsFor(curProp().type).forEach(([v, l]) => opSel.appendChild(h("option", { value: v, selected: v === cond.operator || null }, l)));
+  };
+  const fillVal = () => {
+    valHolder.innerHTML = "";
+    const p = curProp();
+    if (["empty", "notempty", "checked", "unchecked"].includes(opSel.value)) return;
+    if (p.type === "select" || p.type === "multiselect") {
+      const s = h("select", { class: "input", onchange: () => cond.value = s.value });
+      (p.options || []).forEach((o) => s.appendChild(h("option", { value: o.id, selected: o.id === cond.value || null }, o.name)));
+      cond.value = cond.value || (p.options?.[0]?.id ?? ""); valHolder.appendChild(s);
+    } else if (p.type === "date") {
+      valHolder.appendChild(h("input", { class: "input", type: "date", value: cond.value || "", onchange: (e) => cond.value = e.target.value }));
+    } else if (p.type !== "checkbox") {
+      valHolder.appendChild(h("input", { class: "input", type: p.type === "number" ? "number" : "text", value: cond.value || "", placeholder: "valor", oninput: (e) => cond.value = e.target.value }));
+    }
+  };
+  propSel.onchange = () => { cond.propId = propSel.value; cond.operator = opsFor(curProp().type)[0][0]; cond.value = ""; fillOps(); fillVal(); };
+  opSel.onchange = () => { cond.operator = opSel.value; fillVal(); };
+  fillOps(); fillVal();
+
+  return h("div", { class: "filter-cond-row" }, propSel, opSel, valHolder,
+    h("button", { class: "icon-btn", "aria-label": "Remover", onclick: () => { currentView().filterGroup.conditions.splice(idx, 1); repaint(); } }, "✕"));
 }
 
 /* ── Linhas visíveis (filtro + busca + ordenação) ── */
@@ -215,6 +318,14 @@ function visibleRows() {
       const v = r.values[f.propId];
       if (p.type === "multiselect") return (v || []).includes(f.value);
       return v === f.value;
+    });
+  }
+  // filtros avançados E/OU
+  const fg = view.filterGroup;
+  if (fg && fg.conditions?.length) {
+    rows = rows.filter((r) => {
+      const results = fg.conditions.map((c) => matchCondition(r, c, db));
+      return fg.op === "or" ? results.some(Boolean) : results.every(Boolean);
     });
   }
   if (quickFilter.trim()) {
@@ -276,6 +387,8 @@ function propBadge(row, p) {
   if (p.type === "checkbox") return v ? h("span", { class: "chip c-green" }, "✓ " + p.name) : null;
   if (p.type === "url") return h("a", { href: /^https?:/i.test(v) ? v : "https://" + v, target: "_blank", rel: "noopener", onclick: (e) => e.stopPropagation() }, String(v));
   if (p.type === "number") return h("span", { class: "chip" }, Number(v).toLocaleString("pt-BR"));
+  if (p.type === "relation") { const t = getDatabase(p.targetDbId); const n = (v || []).length; return n ? h("span", { class: "chip c-blue" }, `⇄ ${n}`) : null; }
+  if (p.type === "rollup") { const rv = evalRollup(p, row, state.db); return rv && rv !== "—" ? h("span", { class: "chip" }, "Σ " + rv) : null; }
   return h("span", { style: "color:var(--text-3);font-size:var(--fs-xs)" }, String(v));
 }
 
@@ -547,6 +660,8 @@ function columnMenu(e, prop) {
       if (f != null) { prop.formula = f; commit(); renderView(); }
     } });
   }
+  if (prop.type === "relation") items.push({ icon: "⇄", title: "Configurar relação", action: () => configureRelation(prop) });
+  if (prop.type === "rollup") items.push({ icon: "Σ", title: "Configurar rollup", action: () => configureRollup(prop) });
   if (prop.id !== "title") {
     items.push({ sep: true });
     items.push({ icon: "🗑", title: "Excluir propriedade", danger: true, action: () => {
@@ -592,10 +707,62 @@ function addColumnMenu(e) {
         }
         state.db.properties.push(p);
         commit(); renderView();
+        if (t.type === "relation") configureRelation(p);
+        if (t.type === "rollup") configureRollup(p);
       },
     })),
   ]);
 }
+
+/* ── Configuração de Relação ── */
+function configureRelation(prop) {
+  const body = h("div", {});
+  const dbs = listDatabases();
+  if (!dbs.length) { toast("Nenhuma database para relacionar", { type: "warn" }); return; }
+  dbs.forEach((d) => body.appendChild(h("button", {
+    class: "btn " + (prop.targetDbId === d.id ? "primary" : "ghost"),
+    style: "width:100%;justify-content:flex-start;margin-bottom:6px",
+    onclick: () => { prop.targetDbId = d.id; commit(); m.close(); renderView(); toast("Relação configurada"); },
+  }, `${d.icon || "▦"} ${d.name}`)));
+  const m = showModal({ title: `Relacionar “${prop.name}” com…`, body, width: 420 });
+}
+
+/* ── Configuração de Rollup ── */
+function configureRollup(prop) {
+  const relProps = state.db.properties.filter((p) => p.type === "relation" && p.targetDbId);
+  if (!relProps.length) { toast("Crie uma propriedade de Relação (configurada) primeiro", { type: "warn" }); return; }
+
+  const relSel = h("select", { class: "input" });
+  relProps.forEach((p) => relSel.appendChild(h("option", { value: p.id, selected: p.id === prop.relationPropId || null }, p.name)));
+  const tgtSel = h("select", { class: "input" });
+  const aggSel = h("select", { class: "input" });
+  [["count", "Contagem"], ["sum", "Soma"], ["avg", "Média"], ["min", "Mínimo"], ["max", "Máximo"], ["show", "Mostrar valores"]]
+    .forEach(([v, l]) => aggSel.appendChild(h("option", { value: v, selected: v === prop.agg || null }, l)));
+
+  const fillTargets = () => {
+    tgtSel.innerHTML = "";
+    const rp = relProps.find((p) => p.id === relSel.value);
+    const target = rp && getDatabase(rp.targetDbId);
+    (target?.properties || []).forEach((p) => tgtSel.appendChild(h("option", { value: p.id, selected: p.id === prop.targetPropId || null }, p.name)));
+  };
+  relSel.onchange = fillTargets;
+  fillTargets();
+
+  const save = h("button", { class: "btn primary" }, "Salvar");
+  const m = showModal({
+    title: `Rollup “${prop.name}”`,
+    body: h("div", { style: "display:flex;flex-direction:column;gap:10px" },
+      label("Pela relação"), relSel,
+      label("Propriedade a agregar"), tgtSel,
+      label("Cálculo"), aggSel),
+    footer: [save], width: 440,
+  });
+  save.onclick = () => {
+    prop.relationPropId = relSel.value; prop.targetPropId = tgtSel.value; prop.agg = aggSel.value;
+    commit(); m.close(); renderView(); toast("Rollup configurado");
+  };
+}
+function label(t) { return h("div", { style: "font-size:var(--fs-xs);color:var(--text-3);font-weight:600" }, t); }
 
 /* ── Células por tipo ── */
 function renderCell(row, prop, isFirst) {
@@ -697,8 +864,81 @@ function renderCell(row, prop, isFirst) {
       cell.appendChild(val === "" ? h("span", { class: "cell-empty" }, "—") : h("span", {}, val));
       return cell;
     }
+    case "relation": {
+      const cell = h("div", { class: cls, style: "flex-wrap:wrap" });
+      const target = prop.targetDbId ? getDatabase(prop.targetDbId) : null;
+      const paint = () => {
+        cell.innerHTML = "";
+        if (!target) { cell.appendChild(h("span", { class: "cell-empty" }, "config →")); return; }
+        const ids = row.values[prop.id] || [];
+        if (!ids.length) cell.appendChild(h("span", { class: "cell-empty" }, "—"));
+        ids.forEach((rid) => {
+          const r = target.rows.find((x) => x.id === rid);
+          if (r) cell.appendChild(h("span", { class: "chip c-blue rel-chip" }, r.values.title || "Sem nome"));
+        });
+      };
+      cell.onclick = (e) => {
+        if (!prop.targetDbId) { columnMenu(e, prop); return; }
+        relationMenu(cell, prop, row, paint);
+      };
+      paint();
+      return cell;
+    }
+    case "rollup": {
+      const cell = h("div", { class: cls + " cell-formula", title: "Rollup (somente leitura)" });
+      const val = evalRollup(prop, row, state.db);
+      cell.appendChild(val === "" ? h("span", { class: "cell-empty" }, "—") : h("span", {}, val));
+      return cell;
+    }
     default:
       return h("div", { class: cls }, h("span", { class: "cell-empty" }, "—"));
+  }
+}
+
+/* ── Relação: escolher linhas de outra database ── */
+function relationMenu(anchor, prop, row, repaint) {
+  const target = getDatabase(prop.targetDbId);
+  if (!target) return;
+  const ids = () => row.values[prop.id] || [];
+  const items = target.rows.slice(0, 60).map((r) => ({
+    icon: ids().includes(r.id) ? "✓" : " ",
+    title: r.values.title || "Sem nome",
+    action: () => {
+      const cur = new Set(ids());
+      cur.has(r.id) ? cur.delete(r.id) : cur.add(r.id);
+      row.values[prop.id] = [...cur];
+      row.updatedAt = Date.now();
+      commit(); repaint();
+    },
+  }));
+  showMenu(anchor, [{ label: `Relacionar com ${target.name}` }, ...(items.length ? items : [{ title: "A outra database está vazia" }])]);
+}
+
+/* ── Rollup: agrega uma propriedade das linhas relacionadas ── */
+function evalRollup(prop, row, db) {
+  const relProp = db.properties.find((p) => p.id === prop.relationPropId && p.type === "relation");
+  if (!relProp || !relProp.targetDbId) return "";
+  const target = getDatabase(relProp.targetDbId);
+  if (!target) return "";
+  const ids = row.values[relProp.id] || [];
+  const rows = ids.map((id) => target.rows.find((r) => r.id === id)).filter(Boolean);
+  const tProp = target.properties.find((p) => p.id === prop.targetPropId);
+  if (!tProp && prop.agg !== "count") return String(rows.length);
+  const vals = rows.map((r) => {
+    let v = r.values[tProp?.id];
+    if (tProp?.type === "select") return tProp.options?.find((o) => o.id === v)?.name ?? "";
+    if (tProp?.type === "checkbox") return v ? 1 : 0;
+    if (tProp?.type === "formula") return parseFloat(evalFormula(tProp, r, target)) || 0;
+    return v;
+  });
+  const nums = vals.map((v) => parseFloat(v)).filter((n) => !isNaN(n));
+  switch (prop.agg) {
+    case "count": return String(rows.length);
+    case "sum": return String(nums.reduce((a, b) => a + b, 0));
+    case "avg": return nums.length ? (nums.reduce((a, b) => a + b, 0) / nums.length).toFixed(1) : "0";
+    case "min": return nums.length ? String(Math.min(...nums)) : "—";
+    case "max": return nums.length ? String(Math.max(...nums)) : "—";
+    default: return vals.filter((v) => v != null && v !== "").join(", ") || "—";
   }
 }
 

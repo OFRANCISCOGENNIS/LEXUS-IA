@@ -225,3 +225,9 @@ tr:hover .row-menu-btn { opacity: 1; }
 
 .db-cell.cell-formula { color: var(--text-2); font-variant-numeric: tabular-nums; cursor: default; }
 .db-cell.cell-formula span { font-weight: 550; }
+
+/* ═══════════ Relação · Rollup · Filtros avançados ═══════════ */
+.rel-chip { cursor: pointer; }
+.filter-conditions { display: flex; flex-direction: column; gap: 8px; }
+.filter-cond-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.filter-cond-row select, .filter-cond-row input { padding: 5px 8px; font-size: var(--fs-sm); }
