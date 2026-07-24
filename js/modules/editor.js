@@ -44,6 +44,9 @@ const BLOCK_DEFS = [
   { type: "video", icon: "🎬", title: "Vídeo", desc: "Vídeo local (upload)", kw: "video filme media clipe" },
   { type: "audio", icon: "🎧", title: "Áudio", desc: "Áudio local (upload)", kw: "audio som media musica" },
   { type: "bookmark", icon: "🔖", title: "Bookmark", desc: "Cartão de link para uma URL", kw: "bookmark link favorito url site" },
+  { type: "embed", icon: "▣", title: "Embed", desc: "YouTube, Spotify, Maps, Figma, Loom, CodePen…", kw: "embed incorporar youtube spotify mapa maps figma loom codepen video" },
+  { type: "equation", icon: "ƒ", title: "Equação", desc: "Fórmula matemática (LaTeX/KaTeX)", kw: "equacao formula matematica latex katex math" },
+  { type: "columns", icon: "◫", title: "Colunas", desc: "Duas colunas lado a lado", kw: "colunas columns lado layout duas" },
   { type: "toc", icon: "☰", title: "Sumário", desc: "Índice automático dos títulos", kw: "sumario toc indice tabela conteudo" },
   { type: "chart", icon: "📊", title: "Gráfico", desc: "Barras a partir de uma database", kw: "grafico chart barra kpi dashboard database" },
   { type: "image", icon: "🖼", title: "Imagem", desc: "Envie ou cole uma imagem", kw: "imagem foto image" },
@@ -351,6 +354,12 @@ function renderBlock(block, { num = 0, inToggle = false } = {}) {
     el.appendChild(renderMedia(block)); el.tabIndex = -1;
   } else if (block.type === "bookmark") {
     el.appendChild(renderBookmark(block)); el.tabIndex = -1;
+  } else if (block.type === "embed") {
+    el.appendChild(renderEmbed(block)); el.tabIndex = -1;
+  } else if (block.type === "equation") {
+    el.appendChild(renderEquation(block)); el.tabIndex = -1;
+  } else if (block.type === "columns") {
+    el.appendChild(renderColumns(block)); el.tabIndex = -1;
   } else if (block.type === "image") {
     el.appendChild(renderImage(block));
   } else if (block.type === "code") {
@@ -969,6 +978,117 @@ function renderBookmark(block) {
       h("div", { class: "bm-url" }, url)));
 }
 
+/* ═══════════ Embed (YouTube, Spotify, Maps, Figma, Loom, CodePen…) ═══════════ */
+function embedSrc(raw) {
+  let url = raw.trim();
+  if (!/^https?:/i.test(url)) url = "https://" + url;
+  let u; try { u = new URL(url); } catch { return null; }
+  const host = u.hostname.replace(/^www\./, "");
+  try {
+    if (/youtube\.com$/.test(host) || host === "youtu.be") {
+      const id = host === "youtu.be" ? u.pathname.slice(1) : (u.searchParams.get("v") || u.pathname.split("/").pop());
+      return { src: "https://www.youtube.com/embed/" + id, ratio: "16/9" };
+    }
+    if (/spotify\.com$/.test(host)) return { src: "https://open.spotify.com/embed" + u.pathname, ratio: "16/9" };
+    if (/loom\.com$/.test(host)) return { src: url.replace("/share/", "/embed/"), ratio: "16/9" };
+    if (/codepen\.io$/.test(host)) return { src: url.replace("/pen/", "/embed/"), ratio: "16/10" };
+    if (/figma\.com$/.test(host)) return { src: "https://www.figma.com/embed?embed_host=nexus&url=" + encodeURIComponent(url), ratio: "16/10" };
+    if (/(google\.[a-z.]+|maps\.google)/.test(host) && /maps/.test(url)) {
+      const q = u.searchParams.get("q") || decodeURIComponent((u.pathname.match(/\/place\/([^/]+)/) || [])[1] || "");
+      return { src: "https://maps.google.com/maps?q=" + encodeURIComponent(q || url) + "&output=embed", ratio: "16/9" };
+    }
+  } catch {}
+  return { src: url, ratio: "16/9" }; // genérico (pode ser bloqueado pelo site)
+}
+function renderEmbed(block) {
+  const url = block.props?.url;
+  if (!url) {
+    return h("div", { class: "image-placeholder", style: "flex:1;min-width:0", onclick: async () => {
+      const u = await promptDialog({ title: "Colar link para incorporar", placeholder: "YouTube, Spotify, Maps, Figma, Loom, CodePen…" });
+      if (u) { block.props = { ...block.props, url: u }; commit({ structural: true }); }
+    } }, h("span", {}, "▣"), h("span", {}, "Clique para colar um link (YouTube, Spotify, Maps, Figma…)"));
+  }
+  const info = embedSrc(url);
+  const frame = h("iframe", {
+    src: info.src, loading: "lazy", allow: "fullscreen; picture-in-picture; clipboard-write; encrypted-media",
+    allowfullscreen: "", referrerpolicy: "no-referrer",
+    style: `aspect-ratio:${info.ratio};width:100%;border:0`,
+  });
+  const bar = state.page.locked ? null : h("div", { class: "embed-bar" },
+    h("a", { href: /^https?:/i.test(url) ? url : "https://" + url, target: "_blank", rel: "noopener", class: "embed-open" }, "abrir original ↗"),
+    h("button", { class: "btn ghost sm", onclick: async () => { const u = await promptDialog({ title: "Trocar link", value: url }); if (u != null) { block.props.url = u; commit({ structural: true }); } } }, "trocar"));
+  return h("div", { class: "block-embed", style: "flex:1;min-width:0" }, h("div", { class: "embed-frame" }, frame), bar);
+}
+
+/* ═══════════ Equação (KaTeX carregado sob demanda) ═══════════ */
+let _katex = null;
+function loadKatex() {
+  if (_katex) return _katex;
+  _katex = new Promise((resolve, reject) => {
+    if (window.katex) return resolve(window.katex);
+    const link = document.createElement("link");
+    link.rel = "stylesheet"; link.href = "https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css";
+    document.head.appendChild(link);
+    const s = document.createElement("script");
+    s.src = "https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js";
+    s.onload = () => resolve(window.katex); s.onerror = reject;
+    document.head.appendChild(s);
+  });
+  return _katex;
+}
+function renderEquation(block) {
+  block.props = block.props || { latex: "" };
+  const wrap = h("div", { class: "block-equation", style: "flex:1;min-width:0" });
+  const display = h("div", { class: "eq-display" });
+  const paint = () => {
+    const src = block.props.latex || "";
+    if (!src.trim()) { display.innerHTML = '<span class="eq-empty">Clique para escrever LaTeX — ex.: e^{i\\pi}+1=0</span>'; return; }
+    loadKatex().then((k) => { try { k.render(src, display, { displayMode: true, throwOnError: false }); } catch { display.textContent = "⚠ LaTeX inválido"; } })
+      .catch(() => { display.textContent = src; });
+  };
+  if (!state.page.locked) {
+    display.onclick = () => {
+      if (wrap.querySelector("textarea")) return;
+      const ta = h("textarea", { class: "eq-input", rows: 2, placeholder: "\\frac{a}{b}, \\sum_{i=0}^n, \\sqrt{x}…" });
+      ta.value = block.props.latex || "";
+      const done = () => { block.props.latex = ta.value; touchPageBlocks(state.page.id); ta.replaceWith(display); paint(); };
+      ta.addEventListener("blur", done);
+      ta.addEventListener("keydown", (e) => { if (e.key === "Escape") { e.preventDefault(); ta.blur(); } if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) ta.blur(); });
+      display.replaceWith(ta); ta.focus();
+    };
+  }
+  wrap.appendChild(display);
+  paint();
+  return wrap;
+}
+
+/* ═══════════ Colunas ═══════════ */
+function renderColumns(block) {
+  if (!block.children?.length) block.children = [{ id: uid("b"), type: "column", props: {}, children: [makeBlock()] }, { id: uid("b"), type: "column", props: {}, children: [makeBlock()] }];
+  const grid = h("div", { class: "block-columns", style: `grid-template-columns:repeat(${block.children.length},1fr)` });
+  block.children.forEach((colBlk) => {
+    if (!colBlk.children) colBlk.children = [makeBlock()];
+    const col = h("div", { class: "editor-column" });
+    colBlk.children.forEach((child) => col.appendChild(renderBlock(child, { inToggle: true })));
+    if (!state.page.locked) {
+      col.appendChild(h("button", { class: "col-add", onclick: () => {
+        colBlk.children.push(makeBlock());
+        commit({ structural: true });
+        focusBlock(colBlk.children[colBlk.children.length - 1].id, true);
+      } }, "＋ bloco"));
+    }
+    grid.appendChild(col);
+  });
+  const holder = h("div", { style: "flex:1;min-width:0" }, grid);
+  if (!state.page.locked && block.children.length < 4) {
+    holder.appendChild(h("button", { class: "col-addcol", onclick: () => {
+      block.children.push({ id: uid("b"), type: "column", props: {}, children: [makeBlock()] });
+      commit({ structural: true });
+    } }, "＋ coluna"));
+  }
+  return holder;
+}
+
 /* ═══════════ Imagens ═══════════ */
 function renderImage(block) {
   if (block.props?.src) {
@@ -1162,6 +1282,9 @@ function applySlash(def) {
   if (def.type === "progress") block.props = { value: 40, label: "" };
   if (def.type === "button") block.props = { label: "Clique aqui", action: { type: "url", target: "" } };
   if (def.type === "bookmark") block.props = { url: "" };
+  if (def.type === "embed") block.props = { url: "" };
+  if (def.type === "equation") block.props = { latex: "" };
+  if (def.type === "columns") { block.children = [{ id: uid("b"), type: "column", props: {}, children: [makeBlock()] }, { id: uid("b"), type: "column", props: {}, children: [makeBlock()] }]; }
   if (def.type === "subpage") {
     const child = createPage({ title: "Sub-página", parentId: state.page.id });
     block.props = { pageId: child.id };
@@ -1169,7 +1292,7 @@ function applySlash(def) {
   closeSlash();
 
   // blocos não-textuais ganham um parágrafo em branco logo abaixo, para o fluxo continuar
-  const NEEDS_TRAILING = new Set(["table", "progress", "button", "subpage", "bookmark", "chart", "toc", "divider", "image", "video", "audio"]);
+  const NEEDS_TRAILING = new Set(["table", "progress", "button", "subpage", "bookmark", "chart", "toc", "divider", "image", "video", "audio", "embed", "equation", "columns"]);
   let trailingId = null;
   if (NEEDS_TRAILING.has(def.type)) {
     const found = findBlock(block.id);
@@ -1509,6 +1632,9 @@ function setupTopbar(page) {
   const focusBtn = h("button", { class: "icon-btn", title: "Modo foco", "aria-label": "Modo foco" }, "◎");
   focusBtn.onclick = () => toggleFocusMode(focusBtn);
 
+  const presBtn = h("button", { class: "icon-btn", title: "Modo apresentação", "aria-label": "Apresentação" }, "▷");
+  presBtn.onclick = () => startPresentation(page);
+
   const historyBtn = h("button", { class: "icon-btn", title: "Histórico de versões", "aria-label": "Histórico" }, "↺");
   historyBtn.onclick = () => showHistory(page);
 
@@ -1538,7 +1664,75 @@ function setupTopbar(page) {
     } },
   ], { align: "right" });
 
-  actions.append(focusBtn, historyBtn, moreBtn);
+  actions.append(presBtn, focusBtn, historyBtn, moreBtn);
+}
+
+/* ═══════════ Modo apresentação (página → slides) ═══════════ */
+function startPresentation(page) {
+  // divide os blocos em slides: novo slide a cada H1/H2 ou divisor
+  const slides = [];
+  let cur = [];
+  const flush = () => { if (cur.length) slides.push(cur); cur = []; };
+  (page.blocks || []).forEach((b) => {
+    if (b.type === "h1" || b.type === "h2") { flush(); cur.push(b); }
+    else if (b.type === "divider") { flush(); }
+    else cur.push(b);
+  });
+  flush();
+  if (!slides.length) slides.push(page.blocks);
+
+  let idx = 0;
+  const stage = h("div", { class: "present-stage" });
+  const counter = h("div", { class: "present-counter" });
+  const overlay = h("div", { class: "present-overlay" }, stage,
+    h("div", { class: "present-controls" },
+      h("button", { class: "present-btn", onclick: () => go(-1) }, "‹"),
+      counter,
+      h("button", { class: "present-btn", onclick: () => go(1) }, "›"),
+      h("button", { class: "present-btn", title: "Sair (Esc)", onclick: close }, "✕")));
+
+  const render = () => {
+    stage.innerHTML = "";
+    const slide = h("div", { class: "present-slide anim-fade" });
+    slides[idx].forEach((b) => { const el = staticBlock(b); if (el && el.nodeType) slide.appendChild(el); });
+    stage.appendChild(slide);
+    counter.textContent = `${idx + 1} / ${slides.length}`;
+  };
+  const go = (d) => { idx = clamp(idx + d, 0, slides.length - 1); render(); };
+  function close() {
+    overlay.remove();
+    removeEventListener("keydown", onKey, true);
+    if (document.fullscreenElement) document.exitFullscreen?.().catch(() => {});
+  }
+  const onKey = (e) => {
+    if (e.key === "Escape") { e.preventDefault(); close(); }
+    else if (["ArrowRight", "ArrowDown", " ", "PageDown"].includes(e.key)) { e.preventDefault(); go(1); }
+    else if (["ArrowLeft", "ArrowUp", "PageUp"].includes(e.key)) { e.preventDefault(); go(-1); }
+  };
+  addEventListener("keydown", onKey, true);
+  document.body.appendChild(overlay);
+  overlay.requestFullscreen?.().catch(() => {});
+  render();
+}
+
+/* renderização estática (somente leitura) de um bloco, para apresentação */
+function staticBlock(b) {
+  const safe = sanitizeInline(b.content || "");
+  switch (b.type) {
+    case "h1": return h("h1", { class: "ps-h1", html: safe });
+    case "h2": return h("h2", { class: "ps-h2", html: safe });
+    case "h3": case "h4": return h("h3", { class: "ps-h3", html: safe });
+    case "bulleted": return h("li", { class: "ps-li", html: "• " + safe });
+    case "numbered": return h("li", { class: "ps-li", html: safe });
+    case "todo": return h("div", { class: "ps-li" }, (b.props?.checked ? "☑ " : "☐ "), h("span", { html: safe }));
+    case "quote": return h("blockquote", { class: "ps-quote", html: safe });
+    case "callout": return h("div", { class: "ps-callout" }, (b.props?.icon || "💡") + " ", h("span", { html: safe }));
+    case "code": return h("pre", { class: "ps-code" }, b.content || "");
+    case "image": return b.props?.src ? h("img", { class: "ps-img", src: b.props.src }) : "";
+    case "divider": return h("hr");
+    case "equation": { const d = h("div", { class: "ps-eq" }); loadKatex().then((k) => { try { k.render(b.props?.latex || "", d, { displayMode: true, throwOnError: false }); } catch {} }).catch(() => { d.textContent = b.props?.latex || ""; }); return d; }
+    default: return safe ? h("p", { class: "ps-p", html: safe }) : "";
+  }
 }
 
 function toggleFocusMode(btn) {
