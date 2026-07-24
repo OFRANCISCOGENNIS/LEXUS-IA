@@ -60,11 +60,13 @@ Bloco: `{id, type, content(html), props{}, children[]}` — tipos: p h1-h4 bulle
 
 Databases: `listDatabases()`, `getDatabase(id)`, `createDatabase(partial)`, `updateDatabase(id, patch)`,
 `touchDatabase(id)` (rows/props mutadas in-place), `deleteDatabase(id)`, `makeDatabase(partial)`, `makeRow(db, values)`.
-Database: `{id, name, icon, properties[], rows[], views[]}`.
-Property: `{id, name, type, options?}` — types: `title text number select multiselect date checkbox url`.
+Database: `{id, name, icon, properties[], rows[], views[], automations[]}`.
+Property: `{id, name, type, options?, targetDbId?, relationPropId?, targetPropId?, agg?, formula?}` — types: `title text number select multiselect date checkbox url formula relation rollup`.
 `title` é a property fixa id="title". Select option: `{id, name, color}` (colors: gray blue green amber red purple).
-Row: `{id, values: {propId: valor}, createdAt, updatedAt}` — select guarda option.id; multiselect array de ids; date "YYYY-MM-DD"; checkbox bool.
-View: `{id, name, type:"table"|"kanban", filters[], sorts[], groupBy: propId|null}`.
+Row: `{id, values: {propId: valor}, createdAt, updatedAt}` — select guarda option.id; multiselect/relation array de ids; date "YYYY-MM-DD"; checkbox bool.
+View: `{id, name, type:"table"|"kanban"|"gallery"|"list"|"calendar"|"timeline", filters[], sorts[], groupBy, dateProp?, filterGroup?, startProp?, endProp?, depProp?}`.
+Timeline/Gantt usa `startProp`/`endProp` (data) para barras arrastáveis/redimensionáveis e `depProp` (relação auto-referente) para conectores de dependência.
+Automação: `{id, name, enabled, trigger:{type:"propChanged"|"rowCreated", propId?, toValue?}, actions:[{type:"setProp"|"notify", propId?, value?, message?}]}` — executadas 100% locais em `runAutomations()` ao editar célula, mover no kanban ou criar linha.
 
 Versões: `snapshotPage(id)`, `listVersions(pageId)`, `restoreVersion(pageId, versionId)`.
 Lixeira: `listTrash()`, `restoreFromTrash(trashId)`, `purgeTrash(trashId?)`.

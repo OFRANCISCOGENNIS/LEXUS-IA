@@ -12,7 +12,7 @@ O NEXUS é um workspace de produtividade estilo Notion/Craft/Capacities,
 |---|---|
 | 📝 **Editor de blocos** | Slash menu (`/`), formatação inline, wiki-links `[[...]]` com backlinks, drag & drop com FLIP, histórico de versões com diff, sumário (TOC), capas, tags, bloco de gráfico |
 | ✍ **Modo foco/máquina de escrever** | Isola o parágrafo atual, HUD com contador de palavras e meta de escrita, scroll centralizado |
-| ▦ **Databases** | Views Tabela, Kanban, Galeria, Lista e Calendário; propriedades select, data, número, URL, checkbox, **fórmula**; filtros, ordenação, agrupamento, export CSV |
+| ▦ **Databases** | Views Tabela, Kanban, Galeria, Lista, Calendário e **Timeline/Gantt**; propriedades select, data, número, URL, checkbox, **fórmula, relação, rollup**; filtros simples e avançados (E/OU), ordenação, agrupamento, **automações locais** (gatilho → ação), export CSV |
 | ✓ **Tarefas & Projetos** | Agrega prazos das databases e checklists das páginas em Hoje/Semana/Atrasadas |
 | ◷ **Produtividade** | Pomodoro, hábitos com heatmap, lembretes locais |
 | 🏷 **Tags & Coleções** | Tags por página, páginas de tag automáticas e coleções inteligentes |

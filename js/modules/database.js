@@ -64,6 +64,7 @@ function setupTopbar(db) {
       if (name != null) { updateDatabase(db.id, { name }); render(); }
     } },
     { icon: "⬇", title: "Exportar CSV", action: () => exportCsv(db) },
+    { icon: "⚡", title: "Automações" + ((db.automations?.length) ? ` · ${db.automations.length}` : ""), action: () => automationsModal() },
     { sep: true },
     { icon: "🗑", title: "Excluir database", danger: true, action: async () => {
       const ok = await confirmDialog({ title: "Excluir database?", message: "Ela irá para a lixeira e poderá ser restaurada.", confirmText: "Excluir", danger: true });
@@ -121,6 +122,7 @@ function render() {
       { icon: "▦", title: "Galeria", action: () => addView("gallery") },
       { icon: "☰", title: "Lista", action: () => addView("list") },
       { icon: "📅", title: "Calendário", action: () => addView("calendar") },
+      { icon: "📊", title: "Timeline / Gantt", action: () => addView("timeline") },
     ]),
   }, "＋"));
 
@@ -161,14 +163,20 @@ function viewMenu(e, view) {
   ]);
 }
 
-const VIEW_ICON = { table: "▤", kanban: "▥", gallery: "▦", list: "☰", calendar: "📅" };
-const VIEW_NAME = { table: "Tabela", kanban: "Kanban", gallery: "Galeria", list: "Lista", calendar: "Calendário" };
+const VIEW_ICON = { table: "▤", kanban: "▥", gallery: "▦", list: "☰", calendar: "📅", timeline: "📊" };
+const VIEW_NAME = { table: "Tabela", kanban: "Kanban", gallery: "Galeria", list: "Lista", calendar: "Calendário", timeline: "Timeline" };
 
 function addView(type) {
   const { db } = state;
   const groupBy = type === "kanban" ? db.properties.find((p) => p.type === "select")?.id || null : null;
-  const dateProp = type === "calendar" ? db.properties.find((p) => p.type === "date")?.id || null : null;
+  const dateProps = db.properties.filter((p) => p.type === "date");
+  const dateProp = type === "calendar" ? dateProps[0]?.id || null : null;
   const v = { id: uid("v"), name: VIEW_NAME[type] || "View", type, filters: [], sorts: [], groupBy, dateProp };
+  if (type === "timeline") {
+    v.startProp = dateProps[0]?.id || null;
+    v.endProp = dateProps[1]?.id || null;
+    v.depProp = null;
+  }
   db.views.push(v);
   state.viewId = v.id;
   commit(); render();
@@ -366,6 +374,7 @@ function renderView() {
   else if (view.type === "gallery") renderGallery(el);
   else if (view.type === "list") renderList(el);
   else if (view.type === "calendar") renderCalendar(el);
+  else if (view.type === "timeline") renderTimeline(el);
   else renderTable(el);
   vp.appendChild(el);
 }
@@ -625,7 +634,9 @@ function groupMenu(e) {
 function addRow(values = {}) {
   const row = makeRow(state.db, values);
   state.db.rows.push(row);
-  commit(); renderView();
+  commit();
+  runAutomations(row, { kind: "rowCreated" });
+  renderView();
   return row;
 }
 
@@ -770,9 +781,11 @@ function renderCell(row, prop, isFirst) {
   const cls = "db-cell" + (prop.type === "title" || isFirst ? " cell-title" : "") + (prop.type === "number" ? " cell-number" : "");
   const hasFormula = state.db.properties.some((p) => p.type === "formula");
   const set = (val) => {
+    const old = row.values[prop.id];
     row.values[prop.id] = val; row.updatedAt = Date.now(); commit();
+    const autoChanged = runAutomations(row, { kind: "propChanged", propId: prop.id, oldValue: old, newValue: val });
     // fórmulas dependem de outras células → re-renderiza para recalcular
-    if (hasFormula && prop.type !== "formula") renderView();
+    if (autoChanged || (hasFormula && prop.type !== "formula")) renderView();
   };
 
   switch (prop.type) {
@@ -1090,10 +1103,12 @@ function renderKanban(root) {
       if (!row) return;
       const newVal = opt.id;
       if ((row.values[groupProp.id] ?? null) === newVal) return;
+      const oldVal = row.values[groupProp.id] ?? null;
       flip(board, () => {
         row.values[groupProp.id] = newVal;
         row.updatedAt = Date.now();
         commit();
+        runAutomations(row, { kind: "propChanged", propId: groupProp.id, oldValue: oldVal, newValue: newVal });
         renderView();
       });
     });
@@ -1171,8 +1186,11 @@ function kanbanAddButton(opt, groupProp) {
       if (save && name) {
         const values = { title: name };
         if (opt.id) values[groupProp.id] = opt.id;
-        state.db.rows.push(makeRow(state.db, values));
-        commit(); renderView();
+        const nrow = makeRow(state.db, values);
+        state.db.rows.push(nrow);
+        commit();
+        runAutomations(nrow, { kind: "rowCreated" });
+        renderView();
         return;
       }
       holder.replaceChildren(btn);
@@ -1185,4 +1203,431 @@ function kanbanAddButton(opt, groupProp) {
   };
   holder.appendChild(btn);
   return holder;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   TIMELINE / GANTT
+   ═══════════════════════════════════════════════════════════ */
+const DAY_MS = 86400000;
+const G_DAY_W = 30, G_LABEL_W = 190, G_ROW_H = 38, G_HEAD_H = 46;
+const BAR_BG = { gray: "#64748b", blue: "#3b82f6", green: "#16a34a", amber: "#d97706", red: "#dc2626", purple: "#7c3aed" };
+
+function dayToDate(key) { const [y, m, d] = key.split("-").map(Number); return new Date(y, m - 1, d); }
+function diffDays(a, b) { return Math.round((dayToDate(b) - dayToDate(a)) / DAY_MS); }
+function addDaysKey(key, n) { const dt = dayToDate(key); dt.setDate(dt.getDate() + n); return todayKey(dt); }
+
+function renderTimeline(root) {
+  const { db } = state;
+  const view = currentView();
+  const dateProps = db.properties.filter((p) => p.type === "date");
+  if (!dateProps.length) return emptyView(root, "📊", "A timeline precisa de ao menos uma propriedade do tipo Data.");
+
+  // Resolve propriedades de início / fim / dependência (com defaults tolerantes)
+  let startProp = db.properties.find((p) => p.id === view.startProp && p.type === "date") || dateProps[0];
+  view.startProp = startProp.id;
+  let endProp = view.endProp === null ? null
+    : (db.properties.find((p) => p.id === view.endProp && p.type === "date") || dateProps[1] || null);
+  view.endProp = endProp ? endProp.id : null;
+  const selfRels = db.properties.filter((p) => p.type === "relation" && p.targetDbId === db.id);
+  let depProp = db.properties.find((p) => p.id === view.depProp && p.type === "relation" && p.targetDbId === db.id) || null;
+  view.depProp = depProp ? depProp.id : null;
+
+  // Barra de configuração da view
+  const cfg = h("div", { class: "gantt-config" });
+  const mkSel = (label, propId, opts) => {
+    const sel = h("select", { class: "input sm" });
+    opts.forEach(([v, l]) => sel.appendChild(h("option", { value: v, selected: v === (propId ?? "") || null }, l)));
+    return h("label", { class: "gantt-cfg-item" }, h("span", {}, label), sel);
+  };
+  const startSel = mkSel("Início", startProp.id, dateProps.map((p) => [p.id, p.name]));
+  startSel.querySelector("select").onchange = (e) => { view.startProp = e.target.value; commit(); renderView(); };
+  const endSel = mkSel("Fim", endProp?.id ?? "", [["", "— nenhum —"], ...dateProps.map((p) => [p.id, p.name])]);
+  endSel.querySelector("select").onchange = (e) => { view.endProp = e.target.value || null; if (!e.target.value) view.endProp = null; else view.endProp = e.target.value; commit(); renderView(); };
+  cfg.append(startSel, endSel);
+  const depOpts = [["", "— nenhuma —"], ...selfRels.map((p) => [p.id, p.name]), ["__new", "＋ criar relação de dependência"]];
+  const depSel = mkSel("Dependência", depProp?.id ?? "", depOpts);
+  depSel.querySelector("select").onchange = (e) => {
+    if (e.target.value === "__new") {
+      const np = { id: uid("pr"), name: "Depende de", type: "relation", targetDbId: db.id };
+      db.properties.push(np); view.depProp = np.id; commit(); renderView();
+      toast("Relação de dependência criada — preencha na tabela");
+      return;
+    }
+    view.depProp = e.target.value || null; commit(); renderView();
+  };
+  cfg.append(depSel);
+  root.appendChild(cfg);
+
+  // Linhas visíveis com data de início
+  const rows = visibleRows().filter((r) => r.values[startProp.id]);
+  if (!rows.length) { root.appendChild(h("div", { class: "empty-state", style: "padding-top:8px" }, h("div", { class: "es-desc" }, "Nenhum registro com data de início. Defina a data “" + startProp.name + "” para vê-los aqui."))); return; }
+  rows.sort((a, b) => (a.values[startProp.id] < b.values[startProp.id] ? -1 : 1));
+
+  const endOf = (r) => (endProp && r.values[endProp.id]) || r.values[startProp.id];
+  let min = null, max = null;
+  rows.forEach((r) => { const s = r.values[startProp.id], e = endOf(r); if (!min || s < min) min = s; if (!max || e > max) max = e; });
+  const rangeStart = addDaysKey(min, -2);
+  const rangeEnd = addDaysKey(max, 4);
+  const totalDays = diffDays(rangeStart, rangeEnd) + 1;
+  const gridW = totalDays * G_DAY_W;
+  const idxOf = new Map(rows.map((r, i) => [r.id, i]));
+  const today = todayKey();
+
+  const scroll = h("div", { class: "gantt-scroll" });
+  const inner = h("div", { class: "gantt-inner", style: `width:${G_LABEL_W + gridW}px` });
+
+  // ── Cabeçalho: banda de meses + números dos dias ──
+  const months = h("div", { class: "gantt-months", style: `width:${gridW}px` });
+  let i = 0;
+  while (i < totalDays) {
+    const dk = addDaysKey(rangeStart, i);
+    const dt = dayToDate(dk);
+    let span = 0;
+    while (i + span < totalDays) { const d2 = dayToDate(addDaysKey(rangeStart, i + span)); if (d2.getMonth() !== dt.getMonth() || d2.getFullYear() !== dt.getFullYear()) break; span++; }
+    const lbl = dt.toLocaleDateString("pt-BR", { month: "short", year: "numeric" });
+    months.appendChild(h("div", { class: "gantt-month", style: `width:${span * G_DAY_W}px` }, lbl[0].toUpperCase() + lbl.slice(1)));
+    i += span;
+  }
+  const daysRow = h("div", { class: "gantt-days", style: `width:${gridW}px` });
+  for (let d = 0; d < totalDays; d++) {
+    const dk = addDaysKey(rangeStart, d);
+    const dt = dayToDate(dk);
+    const wknd = dt.getDay() === 0 || dt.getDay() === 6;
+    daysRow.appendChild(h("div", { class: "gantt-day" + (wknd ? " wknd" : "") + (dk === today ? " today" : "") }, String(dt.getDate())));
+  }
+  const head = h("div", { class: "gantt-head", style: `height:${G_HEAD_H}px` },
+    h("div", { class: "gantt-corner", style: `width:${G_LABEL_W}px` }, `${rows.length} ${rows.length === 1 ? "item" : "itens"}`),
+    h("div", { class: "gantt-cols" }, months, daysRow));
+  inner.appendChild(head);
+
+  // ── Corpo: uma linha por registro ──
+  const body = h("div", { class: "gantt-body" });
+  rows.forEach((row) => {
+    const s = row.values[startProp.id], e = endOf(row);
+    const left = diffDays(rangeStart, s) * G_DAY_W;
+    const spanDays = Math.max(0, diffDays(s, e)) + 1;
+    const barW = Math.max(G_DAY_W - 4, spanDays * G_DAY_W - 4);
+    const color = BAR_BG[colorForRow(row) || "blue"] || BAR_BG.blue;
+
+    const bar = h("div", {
+      class: "gantt-bar", title: `${row.values.title || "Sem nome"} · ${fmtDate(s + "T12:00:00")}${endProp ? " → " + fmtDate(e + "T12:00:00") : ""}`,
+      style: `left:${left}px;width:${barW}px;background:${color}`,
+      dataset: { rowId: row.id },
+    }, h("span", { class: "gantt-bar-label" }, row.values.title || "Sem nome"));
+    if (endProp) bar.appendChild(h("span", { class: "gantt-handle" }));
+    ganttDrag(bar, row, { startProp, endProp, rangeStart });
+
+    const track = h("div", { class: "gantt-track", style: `width:${gridW}px` }, bar);
+    // marcador de hoje
+    if (today >= rangeStart && today <= rangeEnd) track.appendChild(h("div", { class: "gantt-todayline", style: `left:${diffDays(rangeStart, today) * G_DAY_W}px` }));
+
+    const label = h("div", { class: "gantt-label", style: `width:${G_LABEL_W}px`, title: row.values.title || "" }, row.values.title || "Sem nome");
+    label.addEventListener("dblclick", () => editTitle(row));
+    body.appendChild(h("div", { class: "gantt-row", style: `height:${G_ROW_H}px` }, label, track));
+  });
+
+  // ── Conectores de dependência (SVG) ──
+  if (depProp) {
+    const paths = [];
+    rows.forEach((row) => {
+      const preds = row.values[depProp.id] || [];
+      const rStartX = diffDays(rangeStart, row.values[startProp.id]) * G_DAY_W;
+      const rY = idxOf.get(row.id) * G_ROW_H + G_ROW_H / 2;
+      preds.forEach((pid) => {
+        if (!idxOf.has(pid)) return;
+        const pr = rows[idxOf.get(pid)];
+        const pEnd = endOf(pr);
+        const pEndX = (diffDays(rangeStart, pEnd) + 1) * G_DAY_W;
+        const pY = idxOf.get(pid) * G_ROW_H + G_ROW_H / 2;
+        const c = Math.max(18, Math.abs(rStartX - pEndX) / 2);
+        paths.push(`<path d="M ${pEndX} ${pY} C ${pEndX + c} ${pY}, ${rStartX - c} ${rY}, ${rStartX - 4} ${rY}" fill="none" stroke="var(--text-faint)" stroke-width="1.5" marker-end="url(#gz-arrow)"/>`);
+      });
+    });
+    if (paths.length) {
+      const svg = h("div", { class: "gantt-deps", style: `left:${G_LABEL_W}px;width:${gridW}px;height:${rows.length * G_ROW_H}px` });
+      svg.innerHTML = `<svg width="${gridW}" height="${rows.length * G_ROW_H}" style="overflow:visible">
+        <defs><marker id="gz-arrow" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto">
+          <path d="M0,0 L7,3.5 L0,7 z" fill="var(--text-faint)"/></marker></defs>${paths.join("")}</svg>`;
+      body.appendChild(svg);
+    }
+  }
+
+  inner.appendChild(body);
+  scroll.appendChild(inner);
+  root.appendChild(scroll);
+}
+
+/* Arrastar barra (mover) e redimensionar borda direita (duração) */
+function ganttDrag(bar, row, { startProp, endProp, rangeStart }) {
+  const onDown = (e) => {
+    if (e.button != null && e.button !== 0) return;
+    const isHandle = e.target.classList.contains("gantt-handle");
+    e.preventDefault();
+    const startX = e.clientX;
+    const origLeft = parseFloat(bar.style.left) || 0;
+    const origW = parseFloat(bar.style.width) || G_DAY_W;
+    bar.classList.add("dragging");
+    document.body.style.cursor = isHandle ? "ew-resize" : "grabbing";
+
+    const onMove = (ev) => {
+      const dx = ev.clientX - startX;
+      if (isHandle) bar.style.width = Math.max(G_DAY_W - 4, origW + dx) + "px";
+      else bar.style.left = origLeft + dx + "px";
+    };
+    const onUp = (ev) => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+      bar.classList.remove("dragging");
+      document.body.style.cursor = "";
+      const dxDays = Math.round((ev.clientX - startX) / G_DAY_W);
+      if (!dxDays) { renderView(); return; }
+      const s0 = row.values[startProp.id];
+      if (isHandle && endProp) {
+        const e0 = row.values[endProp.id] || s0;
+        let ne = addDaysKey(e0, dxDays);
+        if (ne < s0) ne = s0;
+        row.values[endProp.id] = ne;
+      } else {
+        const ns = addDaysKey(s0, dxDays);
+        row.values[startProp.id] = ns;
+        if (endProp && row.values[endProp.id]) row.values[endProp.id] = addDaysKey(row.values[endProp.id], dxDays);
+      }
+      row.updatedAt = Date.now();
+      commit();
+      runAutomations(row, { kind: "propChanged", propId: isHandle ? (endProp?.id || startProp.id) : startProp.id, oldValue: s0, newValue: row.values[startProp.id] });
+      renderView();
+    };
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+  };
+  bar.addEventListener("pointerdown", onDown);
+  bar.addEventListener("dblclick", (e) => { e.stopPropagation(); editTitle(row); });
+}
+
+/* ═══════════════════════════════════════════════════════════
+   AUTOMAÇÕES LOCAIS  (gatilho → ações, tudo no dispositivo)
+   ═══════════════════════════════════════════════════════════ */
+function runAutomations(row, change) {
+  const db = state.db;
+  const autos = db.automations || [];
+  if (!autos.length) return false;
+  let changed = false;
+  const notes = [];
+  for (const a of autos) {
+    if (a.enabled === false) continue;
+    const t = a.trigger || {};
+    let fires = false;
+    if (change.kind === "rowCreated" && t.type === "rowCreated") fires = true;
+    else if (change.kind === "propChanged" && t.type === "propChanged" && (!t.propId || t.propId === change.propId)) {
+      fires = (t.toValue == null || t.toValue === "") ? true : String(change.newValue) === String(t.toValue);
+    }
+    if (!fires) continue;
+    for (const act of a.actions || []) {
+      if (act.type === "notify") { notes.push(act.message || `Automação: ${a.name || "sem nome"}`); continue; }
+      if (act.type === "setProp" && act.propId) {
+        const tp = db.properties.find((p) => p.id === act.propId);
+        if (!tp || ["formula", "rollup"].includes(tp.type)) continue;
+        let val = act.value;
+        if (val === "@today") val = todayKey();
+        else if (val === "@tomorrow") val = todayKey(new Date(Date.now() + DAY_MS));
+        else if (tp.type === "number") { const n = parseFloat(String(val).replace(",", ".")); val = isNaN(n) ? null : n; }
+        else if (tp.type === "checkbox") val = (val === true || val === "true");
+        else if (val === "" && (tp.type === "multiselect" || tp.type === "relation")) val = [];
+        if (JSON.stringify(row.values[act.propId]) !== JSON.stringify(val)) { row.values[act.propId] = val; changed = true; }
+      }
+    }
+  }
+  if (changed) { row.updatedAt = Date.now(); commit(); }
+  notes.forEach((m) => toast(m));
+  return changed;
+}
+
+function describeAutomation(a) {
+  const db = state.db;
+  const pn = (id) => db.properties.find((p) => p.id === id)?.name || "?";
+  const t = a.trigger || {};
+  let trig = t.type === "rowCreated" ? "Ao criar registro" : `Quando “${pn(t.propId)}” mudar`;
+  if (t.type === "propChanged" && t.toValue != null && t.toValue !== "") {
+    const p = db.properties.find((x) => x.id === t.propId);
+    let vl = t.toValue;
+    if (p?.type === "select") vl = p.options?.find((o) => o.id === t.toValue)?.name || vl;
+    if (p?.type === "checkbox") vl = (t.toValue === true || t.toValue === "true") ? "marcado" : "desmarcado";
+    trig += ` p/ “${vl}”`;
+  }
+  const acts = (a.actions || []).map((ac) => {
+    if (ac.type === "notify") return "🔔 notificar";
+    const p = db.properties.find((x) => x.id === ac.propId);
+    let vl = ac.value;
+    if (p?.type === "select") vl = p.options?.find((o) => o.id === ac.value)?.name || "(vazio)";
+    else if (p?.type === "checkbox") vl = (ac.value === true || ac.value === "true") ? "marcado" : "desmarcado";
+    else if (p?.type === "date") vl = ac.value === "@today" ? "hoje" : ac.value === "@tomorrow" ? "amanhã" : "limpar";
+    else if (ac.value === "" || ac.value == null) vl = "(vazio)";
+    return `definir “${pn(ac.propId)}” = ${vl}`;
+  });
+  return `${trig} → ${acts.join(" · ") || "(sem ações)"}`;
+}
+
+function automationsModal() {
+  const db = state.db;
+  db.automations = db.automations || [];
+  const list = h("div", { style: "display:flex;flex-direction:column;gap:8px" });
+  const paint = () => {
+    list.innerHTML = "";
+    if (!db.automations.length) list.appendChild(h("div", { style: "color:var(--text-faint);font-size:var(--fs-sm);padding:6px 0" }, "Nenhuma automação ainda."));
+    db.automations.forEach((a) => list.appendChild(automationCard(a, paint, () => m.close())));
+  };
+  paint();
+  const add = h("button", { class: "btn ghost sm", onclick: () => { m.close(); automationEditor(null); } }, "＋ Nova automação");
+  const m = showModal({
+    title: "⚡ Automações locais",
+    body: h("div", { style: "display:flex;flex-direction:column;gap:12px" },
+      h("div", { style: "font-size:var(--fs-sm);color:var(--text-2)" }, "Reaja a mudanças nesta database automaticamente — 100% local, sem servidor."),
+      list, add),
+    width: 620,
+  });
+}
+
+function automationCard(a, repaint, closeModal) {
+  const db = state.db;
+  const toggle = h("button", { class: "auto-toggle" + (a.enabled === false ? "" : " on"), title: a.enabled === false ? "Ativar" : "Desativar",
+    onclick: () => { a.enabled = a.enabled === false; commit(); repaint(); } }, a.enabled === false ? "○" : "●");
+  return h("div", { class: "auto-card" },
+    toggle,
+    h("div", { class: "auto-body" },
+      h("div", { class: "auto-name" }, a.name || "Automação"),
+      h("div", { class: "auto-desc" }, describeAutomation(a))),
+    h("button", { class: "icon-btn", title: "Editar", onclick: () => { closeModal(); automationEditor(a); } }, "✎"),
+    h("button", { class: "icon-btn", title: "Excluir", onclick: () => { db.automations = db.automations.filter((x) => x !== a); commit(); repaint(); } }, "🗑"));
+}
+
+/* Controle de valor conforme o tipo da propriedade */
+function autoValueControl(prop, current, { includeAny = false } = {}) {
+  if (!prop) { const i = h("input", { class: "input", value: current ?? "" }); return { el: i, get: () => i.value }; }
+  if (prop.type === "select") {
+    const sel = h("select", { class: "input" });
+    sel.appendChild(h("option", { value: "", selected: (current === "" || current == null) || null }, includeAny ? "(qualquer)" : "(vazio)"));
+    (prop.options || []).forEach((o) => sel.appendChild(h("option", { value: o.id, selected: o.id === current || null }, o.name)));
+    return { el: sel, get: () => sel.value };
+  }
+  if (prop.type === "checkbox") {
+    const sel = h("select", { class: "input" });
+    if (includeAny) sel.appendChild(h("option", { value: "", selected: (current === "" || current == null) || null }, "(qualquer)"));
+    sel.appendChild(h("option", { value: "true", selected: (current === true || current === "true") || null }, "Marcado"));
+    sel.appendChild(h("option", { value: "false", selected: (current === false || current === "false") || null }, "Desmarcado"));
+    return { el: sel, get: () => sel.value === "" ? "" : (sel.value === "true") };
+  }
+  if (prop.type === "date" && !includeAny) {
+    const sel = h("select", { class: "input" });
+    [["@today", "Hoje"], ["@tomorrow", "Amanhã"], ["", "Limpar"]].forEach(([v, l]) => sel.appendChild(h("option", { value: v, selected: v === current || null }, l)));
+    return { el: sel, get: () => sel.value };
+  }
+  const i = h("input", { class: "input", value: current == null ? "" : current, placeholder: includeAny ? "(qualquer valor)" : "" });
+  return { el: i, get: () => i.value };
+}
+
+function automationEditor(existing) {
+  const db = state.db;
+  const editable = db.properties.filter((p) => !["formula", "rollup", "relation"].includes(p.type));
+  const draft = existing
+    ? JSON.parse(JSON.stringify(existing))
+    : { id: uid("au"), name: "", enabled: true, trigger: { type: "propChanged", propId: editable.find((p) => p.type === "select")?.id || editable[0]?.id, toValue: "" }, actions: [] };
+
+  const nameIn = h("input", { class: "input", value: draft.name || "", placeholder: "Nome da automação" });
+
+  /* ── Gatilho ── */
+  const trigWrap = h("div", { class: "auto-field" });
+  const paintTrigger = () => {
+    trigWrap.innerHTML = "";
+    const typeSel = h("select", { class: "input" },
+      h("option", { value: "propChanged", selected: draft.trigger.type === "propChanged" || null }, "Quando propriedade mudar"),
+      h("option", { value: "rowCreated", selected: draft.trigger.type === "rowCreated" || null }, "Quando criar registro"));
+    typeSel.onchange = () => { draft.trigger.type = typeSel.value; paintTrigger(); };
+    trigWrap.append(h("div", { class: "auto-label" }, "Gatilho"), typeSel);
+    if (draft.trigger.type === "propChanged") {
+      const propSel = h("select", { class: "input" });
+      editable.forEach((p) => propSel.appendChild(h("option", { value: p.id, selected: p.id === draft.trigger.propId || null }, p.name)));
+      const valHolder = h("div", { style: "flex:1" });
+      const paintVal = () => {
+        const p = editable.find((x) => x.id === propSel.value);
+        const ctrl = autoValueControl(p, draft.trigger.toValue, { includeAny: true });
+        valHolder.replaceChildren(ctrl.el);
+        valHolder._get = ctrl.get;
+      };
+      propSel.onchange = () => { draft.trigger.propId = propSel.value; draft.trigger.toValue = ""; paintVal(); };
+      draft.trigger.propId = draft.trigger.propId || editable[0]?.id;
+      paintVal();
+      trigWrap.append(h("div", { class: "auto-row" }, propSel, h("span", { class: "auto-arrow" }, "="), valHolder));
+      trigWrap._trigGet = () => ({ type: "propChanged", propId: propSel.value, toValue: valHolder._get ? valHolder._get() : "" });
+    } else {
+      trigWrap._trigGet = () => ({ type: "rowCreated" });
+    }
+  };
+  paintTrigger();
+
+  /* ── Ações ── */
+  const actList = h("div", { class: "auto-actions" });
+  const paintActions = () => {
+    actList.innerHTML = "";
+    if (!draft.actions.length) actList.appendChild(h("div", { style: "color:var(--text-faint);font-size:var(--fs-sm)" }, "Sem ações."));
+    draft.actions.forEach((ac, idx) => actList.appendChild(actionRow(ac, idx)));
+  };
+  const actionRow = (ac, idx) => {
+    const row = h("div", { class: "auto-row" });
+    const typeSel = h("select", { class: "input", style: "width:auto" },
+      h("option", { value: "setProp", selected: ac.type === "setProp" || null }, "Definir propriedade"),
+      h("option", { value: "notify", selected: ac.type === "notify" || null }, "Notificar"));
+    const rest = h("div", { style: "display:flex;gap:6px;flex:1;align-items:center" });
+    const paintRest = () => {
+      rest.innerHTML = "";
+      if (ac.type === "notify") {
+        const msg = h("input", { class: "input", value: ac.message || "", placeholder: "Mensagem…" });
+        msg.oninput = () => { ac.message = msg.value; };
+        rest.appendChild(msg);
+      } else {
+        const propSel = h("select", { class: "input", style: "width:auto" });
+        editable.forEach((p) => propSel.appendChild(h("option", { value: p.id, selected: p.id === ac.propId || null }, p.name)));
+        ac.propId = ac.propId || editable[0]?.id;
+        const valHolder = h("div", { style: "flex:1" });
+        const paintVal = () => {
+          const p = editable.find((x) => x.id === propSel.value);
+          const ctrl = autoValueControl(p, ac.value, {});
+          valHolder.replaceChildren(ctrl.el);
+          ac._get = ctrl.get;
+        };
+        propSel.onchange = () => { ac.propId = propSel.value; ac.value = ""; paintVal(); };
+        paintVal();
+        rest.append(propSel, h("span", { class: "auto-arrow" }, "="), valHolder);
+      }
+    };
+    typeSel.onchange = () => { ac.type = typeSel.value; paintRest(); };
+    paintRest();
+    const del = h("button", { class: "icon-btn", title: "Remover ação", onclick: () => { draft.actions.splice(idx, 1); paintActions(); } }, "✕");
+    row.append(typeSel, rest, del);
+    return row;
+  };
+  paintActions();
+  const addAct = h("button", { class: "btn ghost sm", onclick: () => { draft.actions.push({ type: "setProp", propId: editable[0]?.id, value: "" }); paintActions(); } }, "＋ ação");
+
+  const save = h("button", { class: "btn primary" }, "Salvar");
+  const m = showModal({
+    title: existing ? "Editar automação" : "Nova automação",
+    body: h("div", { style: "display:flex;flex-direction:column;gap:14px" },
+      h("div", { class: "auto-field" }, h("div", { class: "auto-label" }, "Nome"), nameIn),
+      trigWrap,
+      h("div", { class: "auto-field" }, h("div", { class: "auto-label" }, "Ações"), actList, addAct)),
+    footer: [h("button", { class: "btn ghost", onclick: () => { m.close(); automationsModal(); } }, "Cancelar"), save],
+    width: 620,
+  });
+  save.onclick = () => {
+    // capta valores atuais dos controles antes de fechar
+    draft.name = nameIn.value.trim() || "Automação";
+    draft.trigger = trigWrap._trigGet ? trigWrap._trigGet() : draft.trigger;
+    draft.actions.forEach((ac) => { if (ac.type === "setProp" && ac._get) { ac.value = ac._get(); delete ac._get; } });
+    db.automations = db.automations || [];
+    if (existing) { const i = db.automations.findIndex((x) => x.id === existing.id); if (i >= 0) db.automations[i] = draft; else db.automations.push(draft); }
+    else db.automations.push(draft);
+    commit();
+    toast(existing ? "Automação atualizada" : "Automação criada");
+    m.close(); automationsModal();
+  };
 }
