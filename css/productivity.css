@@ -1,0 +1,114 @@
+/* ═══════════════ NEXUS · Produtividade (Pomodoro · Hábitos · Lembretes) ═══════════════ */
+
+.productivity .home-greeting { margin-bottom: var(--sp-4); }
+
+.prod-tabs {
+  display: flex; gap: 2px; border-bottom: 1px solid var(--border);
+  margin-bottom: var(--sp-5);
+}
+.prod-tab {
+  padding: 8px 14px 10px; font-size: var(--fs-sm); font-weight: 550;
+  color: var(--text-3); border-radius: var(--r-sm) var(--r-sm) 0 0; position: relative;
+  transition: color var(--t-fast), background var(--t-fast);
+}
+.prod-tab:hover { color: var(--text-2); background: var(--surface-hover); }
+.prod-tab.active { color: var(--text); }
+.prod-tab.active::after {
+  content: ""; position: absolute; left: 10px; right: 10px; bottom: -1px;
+  height: 2px; background: var(--accent); border-radius: 2px;
+}
+.prod-section-title {
+  font-size: var(--fs-xs); font-weight: 650; letter-spacing: .06em;
+  text-transform: uppercase; color: var(--text-3);
+  margin: var(--sp-5) 0 var(--sp-2);
+}
+.prod-toolbar { display: flex; align-items: center; gap: var(--sp-3); margin-bottom: var(--sp-4); flex-wrap: wrap; }
+
+/* ── Pomodoro ── */
+.pomo-modes { display: flex; gap: var(--sp-2); justify-content: center; margin-bottom: var(--sp-6); flex-wrap: wrap; }
+.pomo-mode {
+  padding: 6px 14px; border-radius: var(--r-full);
+  border: 1px solid var(--border); background: var(--surface);
+  font-size: var(--fs-sm); font-weight: 550; color: var(--text-2);
+  transition: all var(--t-fast) var(--ease-out);
+}
+.pomo-mode:hover { border-color: var(--border-strong); }
+.pomo-mode.active { background: var(--accent); border-color: transparent; color: #fff; }
+
+.pomo-dial {
+  position: relative; width: 260px; height: 260px; margin: 0 auto var(--sp-5);
+}
+.pomo-ring { width: 100%; height: 100%; }
+.pomo-ring .ring-bg { stroke: var(--surface-active); }
+.pomo-ring .ring-fg { stroke: var(--accent); transition: stroke-dashoffset 400ms linear; }
+.pomo-center {
+  position: absolute; inset: 0; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 4px;
+}
+.pomo-time { font-size: 3.4rem; font-weight: 700; font-variant-numeric: tabular-nums; letter-spacing: -0.02em; line-height: 1; }
+.pomo-label { font-size: var(--fs-sm); color: var(--text-3); max-width: 180px; text-align: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.pomo-controls { display: flex; gap: var(--sp-3); justify-content: center; margin-bottom: var(--sp-4); }
+.pomo-main { min-width: 130px; font-size: var(--fs-md); padding: 9px 22px; }
+.pomo-focus { max-width: 360px; margin: 0 auto; display: block; text-align: center; }
+
+.pomo-stats { display: flex; justify-content: center; gap: var(--sp-8); margin-top: var(--sp-3); }
+
+.week-bars {
+  display: flex; align-items: flex-end; justify-content: center; gap: var(--sp-3);
+  height: 120px; padding: var(--sp-2) 0;
+}
+.wb-col { display: flex; flex-direction: column; align-items: center; gap: 4px; width: 34px; height: 100%; }
+.wb-track { flex: 1; width: 12px; background: var(--surface-active); border-radius: var(--r-full); display: flex; align-items: flex-end; overflow: hidden; }
+.wb-fill { width: 100%; background: var(--accent); border-radius: var(--r-full); min-height: 3px; transition: height var(--t-slow) var(--ease-out); }
+.wb-label { font-size: 10px; color: var(--text-faint); }
+.wb-val { font-size: 10px; color: var(--text-3); font-weight: 600; height: 12px; }
+
+/* ── Hábitos ── */
+.habit-card { padding: var(--sp-4); margin-bottom: var(--sp-3); }
+.habit-head { display: flex; align-items: center; gap: var(--sp-3); margin-bottom: var(--sp-3); }
+.habit-icon { font-size: 20px; }
+.habit-info { flex: 1; min-width: 0; }
+.habit-name { font-weight: 620; }
+.habit-meta { font-size: var(--fs-xs); color: var(--text-3); }
+.habit-today {
+  width: 40px; height: 40px; border-radius: var(--r-md); flex-shrink: 0;
+  border: 1.5px solid var(--border-strong); background: var(--surface);
+  font-size: 16px; color: transparent; font-weight: 700;
+  transition: all var(--t-fast) var(--ease-spring);
+}
+.habit-today:hover { border-color: var(--accent); transform: scale(1.06); }
+.habit-today.on { color: #fff; border-color: transparent; }
+
+.heatmap { display: flex; gap: 3px; overflow-x: auto; padding-bottom: 4px; }
+.hm-col { display: flex; flex-direction: column; gap: 3px; }
+.hm-cell {
+  width: 13px; height: 13px; border-radius: 3px;
+  background: var(--surface-active); cursor: pointer;
+  transition: transform var(--t-fast), background var(--t-fast);
+}
+.hm-cell:hover { transform: scale(1.25); }
+.hm-cell.today { box-shadow: 0 0 0 1.5px var(--text-3); }
+.hm-cell.future { background: transparent; cursor: default; pointer-events: none; }
+.hm-cell.future:hover { transform: none; }
+
+/* cores de hábito (chips + heat) */
+.hb-c-slate  { background: hsl(215 28% 46%); color: #fff; }
+.hb-c-blue   { background: hsl(214 84% 56%); color: #fff; }
+.hb-c-green  { background: hsl(148 55% 44%); color: #fff; }
+.hb-c-amber  { background: hsl(36 90% 50%); color: #fff; }
+.hb-c-red    { background: hsl(4 74% 57%); color: #fff; }
+.hb-c-purple { background: hsl(268 60% 58%); color: #fff; }
+.hb-c-teal   { background: hsl(176 62% 42%); color: #fff; }
+.habit-today.hb-c-slate.on, .habit-today.hb-c-blue.on, .habit-today.hb-c-green.on,
+.habit-today.hb-c-amber.on, .habit-today.hb-c-red.on, .habit-today.hb-c-purple.on, .habit-today.hb-c-teal.on { }
+
+/* ── Lembretes ── */
+.reminder-list { display: flex; flex-direction: column; gap: var(--sp-2); }
+.reminder-item { display: flex; align-items: center; gap: var(--sp-3); padding: var(--sp-3) var(--sp-4); }
+.reminder-item.done { opacity: 0.55; }
+.reminder-item.done .ri-title { text-decoration: line-through; }
+.ri-body { flex: 1; min-width: 0; }
+.ri-title { font-weight: 550; }
+.ri-when { font-size: var(--fs-xs); color: var(--text-3); margin-top: 2px; }
+.ri-when.overdue { color: var(--danger); font-weight: 600; }

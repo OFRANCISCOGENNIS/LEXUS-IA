@@ -18,6 +18,8 @@ function commands() {
     { icon: "＋", title: "Nova página", kind: "Ação", kbd: "", run: () => newPage() },
     { icon: "▦", title: "Nova database", kind: "Ação", run: () => newDatabase() },
     { icon: "☀", title: "Abrir nota de hoje", kind: "Ação", run: () => { getOrCreateDaily(); navigate("daily"); } },
+    { icon: "◷", title: "Abrir Produtividade (Pomodoro, Hábitos, Lembretes)", kind: "Navegar", run: () => navigate("productivity") },
+    { icon: "🍅", title: "Iniciar Pomodoro", kind: "Ação", run: () => navigate("productivity") },
     { icon: "◉", title: "Ver grafo de conhecimento", kind: "Navegar", run: () => navigate("graph") },
     { icon: "▤", title: "Galeria de templates", kind: "Navegar", run: () => navigate("templates") },
     { icon: "⚙", title: "Configurações", kind: "Navegar", run: () => navigate("settings") },

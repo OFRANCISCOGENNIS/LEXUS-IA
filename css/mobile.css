@@ -1,0 +1,100 @@
+/* ═══════════════════════════════════════════════════════════════
+   NEXUS · Versão mobile / responsiva
+   Sidebar vira drawer off-canvas · layouts em coluna · toque confortável.
+   Carregada por último.
+   ═══════════════════════════════════════════════════════════════ */
+
+/* botão hambúrguer: só aparece no mobile */
+.mobile-only { display: none; }
+
+/* ══════════ Tablet e menor ══════════ */
+@media (max-width: 900px) {
+  .home-grid, .tpl-grid { grid-template-columns: 1fr 1fr !important; }
+}
+
+/* ══════════ Mobile ══════════ */
+@media (max-width: 720px) {
+  :root { --topbar-h: 52px; }
+
+  .mobile-only { display: inline-flex; }
+
+  /* Sidebar como drawer deslizante */
+  .sidebar {
+    position: fixed; top: 0; left: 0; bottom: 0;
+    z-index: 60; width: 82vw; max-width: 320px; min-width: 0;
+    transform: translateX(-100%);
+    transition: transform var(--t-panel) var(--ease-out);
+    box-shadow: var(--shadow-lg);
+  }
+  /* neutraliza o collapse de desktop no mobile */
+  .app.sidebar-collapsed .sidebar { margin-left: 0; }
+  .app.drawer-open .sidebar { transform: translateX(0); }
+
+  .drawer-scrim {
+    position: fixed; inset: 0; z-index: 55;
+    background: rgba(10,10,14,.42);
+    opacity: 0; pointer-events: none;
+    transition: opacity var(--t-med) var(--ease-out);
+  }
+  .app.drawer-open .drawer-scrim { opacity: 1; pointer-events: auto; }
+
+  /* o botão de recolher/expandir da sidebar de desktop some no mobile */
+  #sidebar-collapse, #sidebar-expand { display: none !important; }
+
+  .main-wrap { width: 100%; }
+
+  /* topbar com hambúrguer */
+  .topbar { padding: 0 var(--sp-3); gap: var(--sp-2); }
+  .breadcrumb .crumb { max-width: 44vw; }
+
+  /* páginas: menos respiro lateral */
+  .page-container { padding: var(--sp-4) var(--sp-4) 30vh; }
+  .db-container { padding: var(--sp-4) var(--sp-4) var(--sp-10); }
+  .page-title { font-size: 1.9rem; }
+
+  /* grids em coluna única */
+  .home-grid, .home-quick, .tpl-grid { grid-template-columns: 1fr !important; }
+  .home-quick { gap: var(--sp-3); }
+  .home-stats { flex-wrap: wrap; gap: var(--sp-3); }
+  .home-kpi { flex: 1 1 40%; }
+  .home-kpi + .home-kpi::before { display: none; }
+  .home-perf { flex-wrap: wrap; justify-content: flex-start; }
+
+  /* command palette ocupa quase a tela */
+  .palette { top: 8vh; width: calc(100vw - 24px); }
+  .palette-list { max-height: 60vh; }
+
+  /* modais e menus mais largos */
+  .modal { width: calc(100vw - 24px); }
+  .menu { max-width: calc(100vw - 24px); }
+
+  /* editor: handle de bloco encostado (sem margem negativa grande) */
+  .block-handle { left: -30px; }
+  .block-content { font-size: 1rem; }
+
+  /* databases: rolagem horizontal confortável */
+  .db-toolbar { flex-wrap: wrap; }
+  .db-quicksearch:focus { width: 160px; }
+  .kanban-col { flex-basis: 82vw; max-width: 82vw; }
+
+  /* produtividade */
+  .pomo-dial { width: 220px; height: 220px; }
+  .pomo-time { font-size: 2.8rem; }
+  .pomo-stats { gap: var(--sp-5); }
+
+  /* calendário do diário */
+  .dc-grid { gap: 3px; }
+
+  /* toasts acima da barra inferior */
+  .toast-root { bottom: calc(var(--sp-5) + env(safe-area-inset-bottom, 0px)); }
+
+  /* área de toque mínima */
+  .sidebar-item { padding-top: 8px; padding-bottom: 8px; }
+  .icon-btn { width: 32px; height: 32px; }
+}
+
+/* toque: remove hover-elevações que "grudam" no mobile */
+@media (hover: none) {
+  .card.hoverable:active { transform: scale(0.99); }
+  .sidebar-item:hover { transform: none; }
+}

@@ -111,7 +111,7 @@ export function renderBreadcrumb() {
   const sep = () => bc.appendChild(h("span", { class: "crumb-sep" }, "/"));
 
   const names = {
-    home: "Início", daily: "Notas diárias", graph: "Grafo",
+    home: "Início", daily: "Notas diárias", productivity: "Produtividade", graph: "Grafo",
     settings: "Configurações", templates: "Templates", trash: "Lixeira", search: "Busca",
   };
   if (name === "page") {
@@ -162,6 +162,15 @@ export function initShell() {
   collapse.onclick = () => setCollapsed(true);
   expand.onclick = () => setCollapsed(false);
   if (getSetting("sidebarCollapsed", false)) setCollapsed(true);
+
+  // ── Drawer mobile ──
+  const drawerToggle = document.getElementById("drawer-toggle");
+  const drawerScrim = document.getElementById("drawer-scrim");
+  const setDrawer = (v) => app.classList.toggle("drawer-open", v);
+  drawerToggle?.addEventListener("click", () => setDrawer(!app.classList.contains("drawer-open")));
+  drawerScrim?.addEventListener("click", () => setDrawer(false));
+  // fecha o drawer ao navegar (no mobile a sidebar sobrepõe o conteúdo)
+  bus.on("route:changed", () => setDrawer(false));
 
   // seções recolhíveis
   document.querySelectorAll("[data-toggle-section]").forEach((btn) => {

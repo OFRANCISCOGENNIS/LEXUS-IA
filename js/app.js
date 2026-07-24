@@ -4,6 +4,7 @@ import { initStore, getSetting } from "./core/store.js";
 import { initRouter, registerRoute, navigate, parseHash } from "./core/router.js";
 import { initShell } from "./shell.js";
 import { initPalette } from "./modules/palette.js";
+import { initReminders } from "./core/reminders.js";
 
 async function boot() {
   await initStore();
@@ -13,6 +14,7 @@ async function boot() {
   registerRoute("page", () => import("./modules/editor.js"));
   registerRoute("db", () => import("./modules/database.js"));
   registerRoute("daily", () => import("./modules/daily.js"));
+  registerRoute("productivity", () => import("./modules/productivity.js"));
   registerRoute("graph", () => import("./modules/graph.js"));
   registerRoute("settings", () => import("./modules/settings.js"));
   registerRoute("templates", () => import("./modules/templates.js"));
@@ -27,6 +29,7 @@ async function boot() {
 
   initShell();
   initPalette();
+  initReminders();
   initRouter(document.getElementById("view"));
 
   document.getElementById("app").classList.add("anim-fade");

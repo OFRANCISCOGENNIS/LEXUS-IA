@@ -15,7 +15,9 @@ O NEXUS é um workspace de produtividade estilo Notion/Craft/Capacities,
 | ◉ **Grafo de conhecimento** | Grafo força-dirigido de todas as páginas e links, com pan/zoom e destaque de vizinhança |
 | ⌘K **Command palette** | Navegação, criação, comandos, busca universal com fuzzy matching |
 | ☀ **Daily notes** | Journal com calendário, streak, humor do dia |
-| 🎨 **Personalização** | Claro/escuro/auto, 6 cores de acento, densidade, fonte, largura de página |
+| ◷ **Produtividade** | Timer Pomodoro com estatísticas, rastreador de hábitos com heatmap e streaks, lembretes locais (notificações do navegador) |
+| 📱 **Mobile** | Layout responsivo com sidebar em drawer e telas adaptadas ao toque |
+| 🎨 **Personalização** | Claro/escuro/auto, 8 cores de acento, densidade, fonte, largura de página |
 | 💾 **Data ownership** | Export/import de backup JSON completo, export Markdown e CSV — tudo em IndexedDB no seu dispositivo |
 
 ## 🚀 Rodando
