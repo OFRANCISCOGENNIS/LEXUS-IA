@@ -17,8 +17,8 @@ const ASSETS = [
   "./js/modules/editor.js", "./js/modules/database.js", "./js/modules/palette.js",
   "./js/modules/home.js", "./js/modules/daily.js", "./js/modules/graph.js",
   "./js/modules/search.js", "./js/modules/settings.js", "./js/modules/templates.js",
-  "./js/modules/trash.js", "./js/modules/productivity.js", "./js/modules/tasks.js",
-  "./js/modules/tags.js",
+  "./js/modules/trash.js", "./js/modules/productivity.js", "./js/modules/tasks.js", "./js/modules/tags.js",
+  "./js/core/privacy.js",
 ];
 
 self.addEventListener("install", (e) => {

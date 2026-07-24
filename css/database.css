@@ -222,3 +222,6 @@ tr:hover .row-menu-btn { opacity: 1; }
 .db-group-row td { background: var(--surface-2); padding: 0 !important; }
 .db-group-head { display: flex; align-items: center; gap: var(--sp-2); padding: 7px 12px; }
 .db-group-count { color: var(--text-faint); font-size: var(--fs-xs); font-weight: 600; }
+
+.db-cell.cell-formula { color: var(--text-2); font-variant-numeric: tabular-nums; cursor: default; }
+.db-cell.cell-formula span { font-weight: 550; }

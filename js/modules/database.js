@@ -16,6 +16,7 @@ const PROP_TYPES = [
   { type: "date", icon: "📅", name: "Data" },
   { type: "checkbox", icon: "☑", name: "Checkbox" },
   { type: "url", icon: "🔗", name: "URL" },
+  { type: "formula", icon: "∑", name: "Fórmula" },
 ];
 const TYPE_ICON = Object.fromEntries(PROP_TYPES.map((t) => [t.type, t.icon]));
 TYPE_ICON.title = "T";
@@ -540,6 +541,12 @@ function columnMenu(e, prop) {
   if (prop.type === "select" || prop.type === "multiselect") {
     items.push({ icon: "◉", title: "Editar opções", action: () => editOptions(prop) });
   }
+  if (prop.type === "formula") {
+    items.push({ icon: "∑", title: "Editar fórmula", action: async () => {
+      const f = await promptDialog({ title: "Fórmula", label: "Use {Nome da propriedade}. Funções: round, abs, min, max, if.", value: prop.formula || "" });
+      if (f != null) { prop.formula = f; commit(); renderView(); }
+    } });
+  }
   if (prop.id !== "title") {
     items.push({ sep: true });
     items.push({ icon: "🗑", title: "Excluir propriedade", danger: true, action: () => {
@@ -579,6 +586,10 @@ function addColumnMenu(e) {
         if (name == null) return;
         const p = { id: uid("pr"), name, type: t.type };
         if (t.type === "select" || t.type === "multiselect") p.options = [];
+        if (t.type === "formula") {
+          const f = await promptDialog({ title: "Fórmula", label: "Use {Nome da propriedade}. Ex.: {Preço} * {Qtd}", placeholder: "{A} + {B}" });
+          p.formula = f || "";
+        }
         state.db.properties.push(p);
         commit(); renderView();
       },
@@ -590,7 +601,12 @@ function addColumnMenu(e) {
 function renderCell(row, prop, isFirst) {
   const v = row.values[prop.id];
   const cls = "db-cell" + (prop.type === "title" || isFirst ? " cell-title" : "") + (prop.type === "number" ? " cell-number" : "");
-  const set = (val) => { row.values[prop.id] = val; row.updatedAt = Date.now(); commit(); };
+  const hasFormula = state.db.properties.some((p) => p.type === "formula");
+  const set = (val) => {
+    row.values[prop.id] = val; row.updatedAt = Date.now(); commit();
+    // fórmulas dependem de outras células → re-renderiza para recalcular
+    if (hasFormula && prop.type !== "formula") renderView();
+  };
 
   switch (prop.type) {
     case "title":
@@ -675,9 +691,44 @@ function renderCell(row, prop, isFirst) {
       paint();
       return cell;
     }
+    case "formula": {
+      const val = evalFormula(prop, row, state.db);
+      const cell = h("div", { class: cls + " cell-formula", title: "Fórmula (somente leitura) — edite no menu da coluna" });
+      cell.appendChild(val === "" ? h("span", { class: "cell-empty" }, "—") : h("span", {}, val));
+      return cell;
+    }
     default:
       return h("div", { class: cls }, h("span", { class: "cell-empty" }, "—"));
   }
+}
+
+/* avaliador de fórmula seguro: substitui {Prop} e avalia aritmética/funções */
+function evalFormula(prop, row, db) {
+  let expr = (prop.formula || "").trim();
+  if (!expr) return "";
+  expr = expr.replace(/\{([^}]+)\}/g, (_, name) => {
+    const p = db.properties.find((x) => x.name.toLowerCase() === name.trim().toLowerCase());
+    if (!p || p.id === prop.id) return "0";
+    let v = row.values[p.id];
+    if (p.type === "select") v = p.options?.find((o) => o.id === v)?.name ?? "";
+    if (p.type === "checkbox") return v ? "1" : "0";
+    if (p.type === "number") return String(Number(v) || 0);
+    if (p.type === "formula") return "0";
+    return JSON.stringify(String(v ?? ""));
+  });
+  expr = expr.replace(/\bif\s*\(/gi, "iff(");
+  // whitelist de caracteres e identificadores
+  if (!/^[\s0-9.+\-*/%(),<>=!?:"'\]\[a-zA-Z_]*$/.test(expr)) return "⚠";
+  const idents = expr.match(/[a-zA-Z_]\w*/g) || [];
+  const allowed = new Set(["iff", "round", "abs", "min", "max", "floor", "ceil", "true", "false"]);
+  if (idents.some((id) => !allowed.has(id))) return "⚠";
+  try {
+    const fn = new Function("iff", "round", "abs", "min", "max", "floor", "ceil",
+      `"use strict"; return (${expr});`);
+    const res = fn((c, a, b) => (c ? a : b), Math.round, Math.abs, Math.min, Math.max, Math.floor, Math.ceil);
+    if (typeof res === "number") return Number.isFinite(res) ? (Number.isInteger(res) ? String(res) : res.toFixed(2)) : "⚠";
+    return String(res);
+  } catch { return "⚠"; }
 }
 
 function textCell(cls, value, set, placeholder = "", fmt = (s) => s) {

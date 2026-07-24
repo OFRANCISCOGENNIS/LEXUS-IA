@@ -1,7 +1,10 @@
 // ═══════════════ NEXUS · Busca universal ═══════════════
 
-import { searchAll, listPages, getSetting } from "../core/store.js";
+import { searchAll, listPages, getSetting, getPage } from "../core/store.js";
+import { isUnlocked } from "../core/privacy.js";
 import { navigate } from "../core/router.js";
+
+const hidden = (r) => r.kind === "page" && getPage(r.id)?.private && !isUnlocked();
 import { h, debounce, highlightMatch, fmtRelative, escapeHtml, clamp } from "../core/utils.js";
 
 const FILTERS = [
@@ -29,7 +32,7 @@ export default {
 
     const run = () => {
       state.query = input.value.trim();
-      state.results = state.query ? searchAll(state.query, { limit: 50 }) : [];
+      state.results = (state.query ? searchAll(state.query, { limit: 50 }) : []).filter((r) => !hidden(r));
       state.selected = 0;
       paint(chipsRow, resultsEl);
     };

@@ -4,6 +4,7 @@ import { listPages, listDatabases, workspaceStats, getOrCreateDaily } from "../c
 import { estimateStorage } from "../core/db.js";
 import { navigate } from "../core/router.js";
 import { h, fmtRelative, stripHtml } from "../core/utils.js";
+import { isUnlocked } from "../core/privacy.js";
 import { newPage, newDatabase } from "../shell.js";
 
 export default {
@@ -38,7 +39,8 @@ export default {
       wrap.appendChild(h("h2", { class: "home-section-title" }, "Recentes"));
       const grid = h("div", { class: "home-grid" });
       recents.forEach((p, i) => {
-        const preview = stripHtml((p.blocks || []).map((b) => b.content).join(" ")).slice(0, 90);
+        const isPriv = p.private && !isUnlocked();
+        const preview = isPriv ? "🔒 Página privada" : stripHtml((p.blocks || []).map((b) => b.content).join(" ")).slice(0, 90);
         grid.appendChild(h("button", {
           class: "card hoverable home-page-card", style: `animation-delay:${i * 35}ms`,
           onclick: () => navigate("page", p.id),

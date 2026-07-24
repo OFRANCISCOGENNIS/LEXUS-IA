@@ -16,6 +16,7 @@ import {
 } from "../core/utils.js";
 import { showMenu, closeMenus, toast, showModal, emojiPicker, confirmDialog, promptDialog } from "../core/ui.js";
 import { pageToMarkdown } from "../core/markdown.js";
+import { hasPin, isUnlocked, setPin, verifyPin } from "../core/privacy.js";
 
 /* ── Definições de blocos para o slash menu ── */
 const BLOCK_DEFS = [
@@ -117,6 +118,11 @@ export default {
       container.innerHTML = `<div class="empty-state"><div class="es-icon">🗂</div>
         <div class="es-title">Página não encontrada</div>
         <div class="es-desc">Ela pode ter sido movida para a lixeira.</div></div>`;
+      return;
+    }
+    // página privada → exige PIN nesta sessão
+    if (page.private && !isUnlocked()) {
+      renderLockScreen(container, page);
       return;
     }
     state = { page, container, cleanups: [], focusMode: false };
@@ -617,6 +623,45 @@ function onPaste(e, content, block) {
   commit({ structural: true });
   const last = newBlocks[newBlocks.length - 1];
   focusBlock(last.id, false);
+}
+
+/* ═══════════ Tela de bloqueio (PIN) ═══════════ */
+function renderLockScreen(container, page) {
+  container.innerHTML = "";
+  const input = h("input", { class: "input", type: "password", inputmode: "numeric",
+    placeholder: "PIN", style: "text-align:center;letter-spacing:6px;font-size:1.3rem;max-width:200px" });
+  const msg = h("div", { style: "color:var(--danger);font-size:var(--fs-xs);height:16px" });
+  const btn = h("button", { class: "btn primary" }, "Desbloquear");
+  const box = h("div", { class: "lock-screen" },
+    h("div", { class: "lock-icon" }, "🔒"),
+    h("div", { class: "lock-title" }, page.title || "Página privada"),
+    h("div", { class: "lock-desc" }, "Digite seu PIN local para ver esta página."),
+    input, msg, btn);
+  container.appendChild(box);
+  const tryUnlock = async () => {
+    if (await verifyPin(input.value)) { navigate("page", page.id); }
+    else { msg.textContent = "PIN incorreto"; input.value = ""; input.focus(); }
+  };
+  btn.onclick = tryUnlock;
+  input.addEventListener("keydown", (e) => { if (e.key === "Enter") tryUnlock(); });
+  setTimeout(() => input.focus(), 60);
+}
+
+async function togglePrivate(page) {
+  if (!page.private) {
+    if (!hasPin()) {
+      const pin = await promptDialog({ title: "Criar PIN", label: "Defina um PIN local (só neste dispositivo):", placeholder: "ex.: 1234" });
+      if (!pin) return;
+      await setPin(pin);
+      toast("PIN criado 🔐");
+    }
+    updatePage(page.id, { private: true });
+    toast("Página agora é privada");
+  } else {
+    updatePage(page.id, { private: false });
+    toast("Privacidade removida");
+  }
+  navigate("page", page.id);
 }
 
 /* ═══════════ Tags da página ═══════════ */
@@ -1299,6 +1344,8 @@ function setupTopbar(page) {
     { icon: "⧉", title: "Duplicar página", action: () => { const c = duplicatePage(page.id); navigate("page", c.id); } },
     { icon: page.locked ? "🔓" : "🔒", title: page.locked ? "Desbloquear página" : "Bloquear página (somente leitura)",
       action: () => { updatePage(page.id, { locked: !page.locked }); navigate("page", page.id); } },
+    { icon: page.private ? "👁" : "🔐", title: page.private ? "Remover privacidade" : "Tornar privada (PIN)",
+      action: () => togglePrivate(page) },
     { sep: true },
     { icon: "⬇", title: "Exportar como Markdown", action: () => {
       import("../core/utils.js").then(({ download }) =>
