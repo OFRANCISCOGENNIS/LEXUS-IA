@@ -1614,6 +1614,8 @@ function blockMenu(e, block) {
       action: () => { block.type = d.type; commit({ structural: true }); },
     })),
     { sep: true },
+    { icon: "↑", title: "Mover para cima", action: () => moveBlock(block, -1) },
+    { icon: "↓", title: "Mover para baixo", action: () => moveBlock(block, +1) },
     { icon: "⧉", title: "Duplicar", kbd: "⌘D", action: () => {
       const copy = structuredClone(block); copy.id = uid("b");
       (copy.children || []).forEach((c) => (c.id = uid("b")));
@@ -1626,6 +1628,18 @@ function blockMenu(e, block) {
       commit({ structural: true });
     } },
   ]);
+}
+
+/* Move um bloco para cima/baixo dentro da sua lista (reordenar sem arrastar — essencial no mobile) */
+function moveBlock(block, dir) {
+  const found = findBlock(block.id);
+  if (!found) return;
+  const { list, index } = found;
+  const target = index + dir;
+  if (target < 0 || target >= list.length) return;
+  const [b] = list.splice(index, 1);
+  list.splice(target, 0, b);
+  commit({ structural: true });
 }
 
 /* ═══════════ Drag & drop de blocos ═══════════ */

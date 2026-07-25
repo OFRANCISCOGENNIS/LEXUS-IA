@@ -112,7 +112,15 @@
   /* checkbox de tarefa: alvo de toque maior e sempre acima da alça */
   .block[data-type="todo"] .block-prefix { position: relative; z-index: 2; width: 32px; padding-top: 3px; }
   .todo-check { width: 24px; height: 24px; font-size: 14px; touch-action: manipulation; }
-  .toggle-arrow { position: relative; z-index: 2; }
+  .toggle-arrow { position: relative; z-index: 2; touch-action: manipulation; }
+
+  /* colunas empilham na vertical (não cabem lado a lado no celular) */
+  .block-columns { grid-template-columns: 1fr !important; gap: var(--sp-2); }
+  /* tabelas de bloco e conteúdos largos rolam dentro de si, sem estourar a página */
+  .block-tableblock { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .present-slide { padding: 20px !important; }
+  /* menus de bloco/menções não ultrapassam a largura da tela */
+  .menu { max-width: calc(100vw - 16px); }
 
   /* ── Databases ── */
   .db-toolbar { flex-wrap: wrap; gap: var(--sp-1); }
@@ -181,11 +189,15 @@
   .mobile-fab[hidden] { display: none; }
 }
 
-/* toque: remove hover-elevações que "grudam" no mobile */
+/* toque: remove hover-elevações que "grudam" no mobile e revela controles
+   que dependiam de :hover (inalcançáveis sem cursor) */
 @media (hover: none) {
   .card.hoverable:active { transform: scale(0.99); }
   .sidebar-item:hover { transform: none; }
   .block-handle { opacity: .4; } /* sempre visível para poder tocar */
   .row-menu-btn { opacity: 1; }
   .code-copy, .cover-actions { opacity: 1; }
+  .kanban-card .kc-menu { opacity: 1; } /* mover cartão no toque (arraste HTML5 não funciona) */
+  .kanban-card { cursor: default; }
+  .gc-cover .row-menu-btn, .db-list-item .row-menu-btn { opacity: 1; }
 }

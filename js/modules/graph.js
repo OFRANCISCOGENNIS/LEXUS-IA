@@ -211,16 +211,32 @@ function createSim(canvas, tip, nodes, edges) {
   }
 
   /* interações */
+  const pointers = new Map(); // pinça: rastreia dedos ativos
+  let pinchDist = 0;
+  const twoPts = () => [...pointers.values()];
+  const pinchInfo = () => { const [a, b] = twoPts(); return { dist: Math.hypot(a.x - b.x, a.y - b.y), mx: (a.x + b.x) / 2, my: (a.y + b.y) / 2 }; };
+
   const onDown = (e) => {
+    pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    const cap = (id) => { try { canvas.setPointerCapture(id); } catch { /* pointer já solto */ } };
+    if (pointers.size === 2) { dragNode = null; panning = false; pinchDist = pinchInfo().dist; cap(e.pointerId); return; }
     const rect = canvas.getBoundingClientRect();
     const px = e.clientX - rect.left, py = e.clientY - rect.top;
     const n = nodeAt(px, py);
     if (n) { dragNode = n; n._moved = false; }
     else panning = true;
     last = { x: e.clientX, y: e.clientY };
-    canvas.setPointerCapture(e.pointerId);
+    cap(e.pointerId);
   };
   const onMove = (e) => {
+    if (pointers.has(e.pointerId)) pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (pointers.size === 2) { // pinça → zoom no ponto médio
+      const rect = canvas.getBoundingClientRect();
+      const { dist, mx, my } = pinchInfo();
+      if (pinchDist > 0 && dist > 0) zoomAt(mx - rect.left, my - rect.top, dist / pinchDist);
+      pinchDist = dist;
+      return;
+    }
     const rect = canvas.getBoundingClientRect();
     const px = e.clientX - rect.left, py = e.clientY - rect.top;
     if (dragNode) {
@@ -251,6 +267,8 @@ function createSim(canvas, tip, nodes, edges) {
     }
   };
   const onUp = (e) => {
+    pointers.delete(e.pointerId);
+    if (pointers.size < 2) pinchDist = 0;
     if (dragNode && !dragNode._moved) navigate("page", dragNode.id);
     dragNode = null; panning = false;
   };
@@ -274,6 +292,7 @@ function createSim(canvas, tip, nodes, edges) {
   canvas.addEventListener("pointerdown", onDown);
   canvas.addEventListener("pointermove", onMove);
   canvas.addEventListener("pointerup", onUp);
+  canvas.addEventListener("pointercancel", onUp);
   canvas.addEventListener("wheel", onWheel, { passive: false });
   const ro = new ResizeObserver(resize);
 

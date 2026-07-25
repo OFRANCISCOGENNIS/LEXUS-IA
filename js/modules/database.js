@@ -1193,10 +1193,14 @@ function kanbanCard(row, groupProp) {
     }
   });
 
+  // botão de menu sempre visível — no toque é a forma de mover/editar (o arraste HTML5 não funciona no mobile)
+  const menuBtn = h("button", { class: "icon-btn kc-menu", "aria-label": "Opções do cartão",
+    onclick: (e) => { e.stopPropagation(); kanbanCardMenu(e, row, groupProp); } }, "⋯");
+
   const card = h("div", {
     class: "kanban-card", draggable: "true", dataset: { flipId: row.id, rowId: row.id },
   },
-    h("div", { class: "kc-title" }, title),
+    h("div", { class: "kc-head" }, h("div", { class: "kc-title" }, title), menuBtn),
     meta
   );
   card.addEventListener("dragstart", (e) => {
@@ -1205,20 +1209,36 @@ function kanbanCard(row, groupProp) {
     card.classList.add("dragging");
   });
   card.addEventListener("dragend", () => card.classList.remove("dragging"));
-  card.addEventListener("dblclick", async () => {
-    const name = await promptDialog({ title: "Editar cartão", value: row.values.title || "" });
-    if (name != null) { row.values.title = name; row.updatedAt = Date.now(); commit(); renderView(); }
-  });
-  card.addEventListener("contextmenu", (e) => {
-    e.preventDefault();
-    showMenu(new DOMRect(e.clientX, e.clientY, 0, 0), [
-      { icon: "🗑", title: "Excluir cartão", danger: true, action: () => {
-        state.db.rows = state.db.rows.filter((r) => r.id !== row.id);
-        commit(); renderView();
-      } },
-    ]);
-  });
+  card.addEventListener("dblclick", () => editTitle(row));
+  card.addEventListener("contextmenu", (e) => { e.preventDefault(); kanbanCardMenu(e, row, groupProp); });
   return card;
+}
+
+/* Menu do cartão do kanban — inclui "Mover para" (alternativa ao arraste, funciona no toque) */
+function kanbanCardMenu(e, row, groupProp) {
+  const cur = row.values[groupProp.id] ?? null;
+  const groups = [...(groupProp.options || []), { id: null, name: "Sem status", color: "gray" }];
+  const move = (optId) => {
+    if ((row.values[groupProp.id] ?? null) === optId) return;
+    const oldVal = row.values[groupProp.id] ?? null;
+    row.values[groupProp.id] = optId; row.updatedAt = Date.now();
+    commit();
+    runAutomations(row, { kind: "propChanged", propId: groupProp.id, oldValue: oldVal, newValue: optId });
+    renderView();
+  };
+  const anchor = e.currentTarget?.getBoundingClientRect ? e.currentTarget : new DOMRect(e.clientX, e.clientY, 0, 0);
+  showMenu(anchor, [
+    { icon: "✎", title: "Editar cartão", action: () => editTitle(row) },
+    { label: "Mover para" },
+    ...groups.filter((g) => g.id !== cur).map((g) => ({
+      icon: "→", title: g.name, action: () => move(g.id),
+    })),
+    { sep: true },
+    { icon: "🗑", title: "Excluir cartão", danger: true, action: () => {
+      state.db.rows = state.db.rows.filter((r) => r.id !== row.id);
+      commit(); renderView();
+    } },
+  ], { align: "right" });
 }
 
 function kanbanAddButton(opt, groupProp) {

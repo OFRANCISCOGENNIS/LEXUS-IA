@@ -152,7 +152,11 @@ tr:hover .row-menu-btn { opacity: 1; }
 }
 .kanban-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-md); }
 .kanban-card.dragging { opacity: 0.4; }
-.kanban-card .kc-title { font-size: var(--fs-sm); font-weight: 560; margin-bottom: 4px; }
+.kanban-card .kc-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 4px; margin-bottom: 4px; }
+.kanban-card .kc-title { font-size: var(--fs-sm); font-weight: 560; flex: 1; min-width: 0; }
+.kanban-card .kc-menu { flex: none; width: 24px; height: 24px; opacity: 0; margin: -2px -4px 0 0; }
+.kanban-card:hover .kc-menu { opacity: .7; }
+.kanban-card .kc-menu:hover { opacity: 1; }
 .kanban-card .kc-meta { display: flex; flex-wrap: wrap; gap: 4px; }
 .kanban-card .kc-meta:empty { display: none; }
 .kanban-drop-hint {
