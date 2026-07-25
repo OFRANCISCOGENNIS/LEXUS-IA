@@ -100,12 +100,19 @@
   .menu { max-width: calc(100vw - 20px); }
 
   /* ── Editor: alças de bloco tocáveis ── */
-  .page-container { padding-left: 26px; }
-  .block-handle { left: -24px; opacity: .45; }
-  .handle-btn { width: 22px; height: 26px; }
+  /* alça empilhada na vertical p/ ficar toda na sarjeta e não cobrir o conteúdo
+     (ex.: o checkbox das tarefas), que antes ficava intocável no celular) */
+  .page-container { padding-left: 28px; }
+  .block-handle { left: -26px; opacity: .4; flex-direction: column; gap: 0; }
+  .handle-btn { width: 22px; height: 22px; }
   .block-content { font-size: 1rem; }
   .fmt-bar { padding: 5px; }
   .fmt-btn { min-width: 34px; height: 34px; }
+
+  /* checkbox de tarefa: alvo de toque maior e sempre acima da alça */
+  .block[data-type="todo"] .block-prefix { position: relative; z-index: 2; width: 32px; padding-top: 3px; }
+  .todo-check { width: 24px; height: 24px; font-size: 14px; touch-action: manipulation; }
+  .toggle-arrow { position: relative; z-index: 2; }
 
   /* ── Databases ── */
   .db-toolbar { flex-wrap: wrap; gap: var(--sp-1); }
