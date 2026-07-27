@@ -55,6 +55,7 @@ export function makeDatabase(partial = {}) {
     id: uid("d"),
     name: "Nova database",
     icon: "▦",
+    description: "",
     properties: [
       { id: "title", name: "Nome", type: "title" },
       pStatus, pPrio, pDate,

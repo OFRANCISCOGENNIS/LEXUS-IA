@@ -106,6 +106,19 @@ function render() {
   }, db.icon || "▦");
   wrap.appendChild(h("div", { class: "db-head" }, iconBtn, nameEl));
 
+  // descrição opcional (como no Notion) — abaixo do título
+  const descEl = h("div", {
+    class: "db-desc", contenteditable: "true", spellcheck: "false",
+    "data-placeholder": "Adicionar descrição…",
+  });
+  descEl.textContent = db.description || "";
+  descEl.addEventListener("input", debounce(() => {
+    if (!descEl.textContent.trim()) descEl.innerHTML = ""; // limpa <br> residual → mostra placeholder
+    updateDatabase(db.id, { description: descEl.textContent.trim() }, { silent: true });
+  }, 400));
+  descEl.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); descEl.blur(); } });
+  wrap.appendChild(descEl);
+
   // toolbar de views
   const tabs = h("div", { class: "db-tabs" });
   db.views.forEach((v) => {

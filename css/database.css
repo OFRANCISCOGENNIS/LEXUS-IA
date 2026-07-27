@@ -15,6 +15,16 @@
 }
 .db-name:empty::before { content: "Sem nome"; color: var(--text-faint); }
 
+/* descrição da database (abaixo do título) */
+.db-desc {
+  margin: -10px 0 16px; padding: 2px 2px;
+  font-size: var(--fs-sm); line-height: 1.55; color: var(--text-2);
+  outline: none; border-radius: var(--r-sm); max-width: 760px;
+  transition: background var(--t-fast);
+}
+.db-desc:focus { background: var(--surface-2); }
+.db-desc:empty::before { content: attr(data-placeholder); color: var(--text-faint); cursor: text; }
+
 /* ── Barra de views ── */
 .db-toolbar {
   display: flex; align-items: center; gap: var(--sp-2);
