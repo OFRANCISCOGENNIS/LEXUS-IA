@@ -261,6 +261,36 @@
   max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 
+/* painel de controles do grafo (estilo Obsidian) */
+.graph-controls {
+  position: absolute; top: calc(var(--sp-3) + 46px); left: var(--sp-4); z-index: 6;
+  width: 240px; max-height: calc(100% - 90px); overflow-y: auto;
+  display: flex; flex-direction: column; gap: 8px;
+  background: var(--glass);
+  backdrop-filter: blur(16px) saturate(1.4);
+  -webkit-backdrop-filter: blur(16px) saturate(1.4);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--r-md); padding: 12px 14px;
+  box-shadow: var(--shadow-md);
+  animation: nx-fade-in 140ms var(--ease-out);
+}
+.gcp-title {
+  font-size: var(--fs-xs); font-weight: 700; text-transform: uppercase;
+  letter-spacing: .05em; color: var(--text-faint); margin-top: 6px;
+}
+.gcp-title:first-child { margin-top: 0; }
+.gcp-check {
+  display: flex; align-items: center; gap: 8px;
+  font-size: var(--fs-sm); color: var(--text-2); cursor: pointer;
+}
+.gcp-check input { accent-color: var(--accent); }
+.gcp-slider { display: flex; flex-direction: column; gap: 2px; font-size: var(--fs-xs); color: var(--text-3); }
+.gcp-slider input[type="range"] { width: 100%; accent-color: var(--accent); }
+
+@media (max-width: 720px) {
+  .graph-controls { left: var(--sp-2); right: var(--sp-2); width: auto; }
+}
+
 /* ═══════════════ Tarefas & Projetos ═══════════════ */
 .tasks .home-stats { border: 1px solid var(--border); }
 .task-section-title {
