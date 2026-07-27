@@ -1,8 +1,9 @@
 // ═══════════════ NEXUS · Service Worker (offline / PWA) ═══════════════
-// Cache-first para os assets do app. Nenhum dado do usuário é armazenado aqui
-// (isso vive em IndexedDB); só o "casco" estático do app fica em cache.
+// Network-first para os assets do app (o cache é só o fallback offline).
+// Nenhum dado do usuário é armazenado aqui (isso vive em IndexedDB);
+// só o "casco" estático do app fica em cache.
 
-const CACHE = "nexus-shell-v8";
+const CACHE = "nexus-shell-v9";
 const ASSETS = [
   "./",
   "./index.html",
@@ -38,21 +39,38 @@ self.addEventListener("activate", (e) => {
   );
 });
 
+// Estratégia: NETWORK-FIRST para o código do app.
+// Cache-first fazia o navegador servir CSS/JS antigos mesmo depois de publicar
+// uma versão nova (o app ficava "uma versão atrás"). Agora, com rede, sempre
+// vem a versão atual; sem rede, cai no cache e o app continua 100% offline.
 self.addEventListener("fetch", (e) => {
   const req = e.request;
   if (req.method !== "GET") return;
   const url = new URL(req.url);
   if (url.origin !== location.origin) return; // não intercepta terceiros
+
   e.respondWith(
-    caches.match(req).then((hit) => {
-      if (hit) return hit;
-      return fetch(req).then((res) => {
-        if (res.ok && (req.destination === "script" || req.destination === "style" || req.destination === "document")) {
+    fetch(req)
+      .then((res) => {
+        if (res && res.ok) {
           const clone = res.clone();
-          caches.open(CACHE).then((c) => c.put(req, clone));
+          caches.open(CACHE).then((c) => c.put(req, clone)).catch(() => {});
         }
         return res;
-      }).catch(() => caches.match("./index.html"));
-    })
+      })
+      .catch(async () => {
+        // offline → cache da versão atual, depois qualquer cache, depois o shell
+        const hit = await caches.match(req, { cacheName: CACHE }) || await caches.match(req);
+        if (hit) return hit;
+        if (req.mode === "navigate" || req.destination === "document") {
+          return (await caches.match("./index.html")) || Response.error();
+        }
+        return Response.error();
+      })
   );
+});
+
+// permite que a página peça a ativação imediata de uma versão nova
+self.addEventListener("message", (e) => {
+  if (e.data === "skip-waiting") self.skipWaiting();
 });

@@ -142,7 +142,12 @@ function buildControls(cfg, apply, getSim) {
   const search = h("input", { class: "input sm", placeholder: "Filtrar páginas…", "aria-label": "Filtrar nós" });
   search.addEventListener("input", () => getSim()?.setQuery(search.value));
 
-  return h("div", { class: "graph-controls" },
+  return h("div", {
+    class: "graph-controls",
+    // rede de segurança: garante que o painel fique acima do canvas e clicável
+    // mesmo se o CSS não tiver carregado (ex.: cache antigo)
+    style: "position:absolute;z-index:6",
+  },
     h("div", { class: "gcp-title" }, "Filtros"),
     search,
     check("Tags", "showTags"),
