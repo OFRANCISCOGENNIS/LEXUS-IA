@@ -12,7 +12,7 @@ import { bus } from "../core/bus.js";
 import { navigate } from "../core/router.js";
 import {
   h, uid, debounce, sanitizeInline, stripHtml, escapeHtml, fuzzyScore, flip,
-  positionFloating, fmtRelative, fmtDate, readingTime, clamp,
+  positionFloating, fmtRelative, fmtDate, readingTime, clamp, isMac,
 } from "../core/utils.js";
 import { showMenu, closeMenus, toast, showModal, emojiPicker, confirmDialog, promptDialog } from "../core/ui.js";
 import { pageToMarkdown } from "../core/markdown.js";
@@ -120,8 +120,48 @@ function findBlock(id, blocks = state.page.blocks, parent = null) {
 }
 
 function commit({ structural = false } = {}) {
+  recordHistory();
   touchPageBlocks(state.page.id);
   if (structural) renderBlocks();
+}
+
+/* ═══════════ Histórico (Desfazer / Refazer — Ctrl+Z / Ctrl+Y) ═══════════ */
+function serializeBlocks() { return JSON.stringify(state.page.blocks); }
+
+// registra o estado anterior sempre que os blocos mudam de fato
+function recordHistory() {
+  if (!state || state._restoring) return;
+  const cur = serializeBlocks();
+  if (cur === state._committed) return;
+  state.undo.push(state._committed);
+  if (state.undo.length > 150) state.undo.shift();
+  state.redo.length = 0;
+  state._committed = cur;
+}
+
+function restoreSnapshot(snap) {
+  state._restoring = true;
+  state.page.blocks = JSON.parse(snap);
+  state._committed = snap;
+  touchPageBlocks(state.page.id);
+  renderBlocks();
+  // devolve o foco ao bloco editado, se ainda existir
+  if (state._focusId && findBlock(state._focusId)) focusBlock(state._focusId, false);
+  state._restoring = false;
+}
+
+function undo() {
+  if (!state?.undo.length) return;
+  state.redo.push(serializeBlocks());
+  restoreSnapshot(state.undo.pop());
+  toast("Desfeito", { duration: 1000 });
+}
+
+function redo() {
+  if (!state?.redo.length) return;
+  state.undo.push(serializeBlocks());
+  restoreSnapshot(state.redo.pop());
+  toast("Refeito", { duration: 1000 });
 }
 
 /* ═══════════ Render ═══════════ */
@@ -139,12 +179,24 @@ export default {
       renderLockScreen(container, page);
       return;
     }
-    state = { page, container, cleanups: [], focusMode: false };
+    state = { page, container, cleanups: [], focusMode: false, undo: [], redo: [], _focusId: null };
+    state._committed = serializeBlocks();
     render(container, page);
     setupTopbar(page);
     snapshotPage(page.id);
     const snapTimer = setInterval(() => snapshotPage(page.id), 180000);
     state.cleanups.push(() => clearInterval(snapTimer));
+
+    // Desfazer / Refazer (Ctrl+Z · Ctrl+Y · Ctrl+Shift+Z) — sobrepõe o undo nativo p/ cobrir mudanças estruturais
+    const onHistKey = (e) => {
+      const mod = isMac ? e.metaKey : e.ctrlKey;
+      if (!mod || !state) return;
+      const k = e.key.toLowerCase();
+      if (k === "z" && !e.shiftKey) { e.preventDefault(); undo(); }
+      else if (k === "y" || (k === "z" && e.shiftKey)) { e.preventDefault(); redo(); }
+    };
+    addEventListener("keydown", onHistKey, true);
+    state.cleanups.push(() => removeEventListener("keydown", onHistKey, true));
   },
   unmount() {
     hideFmtBar();
@@ -415,10 +467,12 @@ function placeholderFor(type) {
 function bindContent(content, block) {
   const save = debounce(() => {
     block.content = sanitizeInline(content.innerHTML);
+    recordHistory();
     touchPageBlocks(state.page.id);
     if (state.metaEl) updateMeta(state.metaEl, state.page);
   }, 400);
 
+  content.addEventListener("focus", () => { if (state) state._focusId = block.id; });
   content.addEventListener("input", () => {
     block.content = content.innerHTML;
     save();

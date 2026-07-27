@@ -2,7 +2,7 @@
 // Cache-first para os assets do app. Nenhum dado do usuário é armazenado aqui
 // (isso vive em IndexedDB); só o "casco" estático do app fica em cache.
 
-const CACHE = "nexus-shell-v5";
+const CACHE = "nexus-shell-v6";
 const ASSETS = [
   "./",
   "./index.html",

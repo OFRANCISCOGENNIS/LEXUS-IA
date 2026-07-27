@@ -4,10 +4,10 @@ import { bus } from "./core/bus.js";
 import { navigate, parseHash } from "./core/router.js";
 import {
   listPages, listDatabases, createPage, createDatabase, getPage, getDatabase,
-  getSetting, setSetting, deletePage, duplicatePage, updatePage,
+  getSetting, setSetting, deletePage, duplicatePage, updatePage, updateDatabase,
 } from "./core/store.js";
 import { h, isMac } from "./core/utils.js";
-import { showMenu, toast, emojiPicker } from "./core/ui.js";
+import { showMenu, toast, emojiPicker, promptDialog } from "./core/ui.js";
 
 /* ── Tema / aparência ── */
 export function applyAppearance() {
@@ -228,19 +228,59 @@ export function initShell() {
     if (["theme", "accent", "density", "font", "pagewidth"].includes(key)) applyAppearance();
   });
 
-  // atalhos globais
+  // atalhos globais (estilo Windows)
   addEventListener("keydown", (e) => {
     const mod = isMac ? e.metaKey : e.ctrlKey;
     const inInput = /INPUT|TEXTAREA|SELECT/.test(document.activeElement?.tagName) ||
       document.activeElement?.isContentEditable;
+    const k = e.key.toLowerCase();
 
-    if (mod && e.key.toLowerCase() === "k") { e.preventDefault(); bus.emit("palette:open", {}); }
-    else if (mod && e.shiftKey && e.key.toLowerCase() === "n") { e.preventDefault(); bus.emit("capture:open", {}); }
+    // ── Ctrl + tecla ──
+    if (mod && !e.shiftKey && !e.altKey && k === "k") { e.preventDefault(); bus.emit("palette:open", {}); }
+    else if (mod && e.shiftKey && k === "n") { e.preventDefault(); bus.emit("capture:open", {}); }
     else if (mod && e.key === "\\") { e.preventDefault(); setCollapsed(!app.classList.contains("sidebar-collapsed")); }
-    else if (mod && e.shiftKey && e.key.toLowerCase() === "l") { e.preventDefault(); toggleTheme(); }
+    else if (mod && e.shiftKey && k === "l") { e.preventDefault(); toggleTheme(); }
+    else if (mod && e.shiftKey && k === "f") { e.preventDefault(); navigate("search"); }   // localizar (busca completa)
+    else if (mod && !e.shiftKey && k === "f") { e.preventDefault(); navigate("search"); }    // Ctrl+F localizar
+    else if (mod && k === "p") { e.preventDefault(); window.print(); }                        // imprimir / exportar PDF
+    else if (mod && k === "s") { e.preventDefault(); toast("Tudo salvo — 100% local ✓", { duration: 1400 }); } // Ctrl+S
+    else if (mod && (e.key === "," )) { e.preventDefault(); navigate("settings"); }           // Ctrl+, configurações
+    // ── Alt + tecla (navegação estilo Explorer/navegador) ──
+    else if (e.altKey && e.key === "ArrowLeft") { e.preventDefault(); history.back(); }
+    else if (e.altKey && e.key === "ArrowRight") { e.preventDefault(); history.forward(); }
+    else if (e.altKey && e.key === "Home") { e.preventDefault(); navigate("home"); }
+    else if (e.altKey && !inInput && /^[1-9]$/.test(e.key)) { e.preventDefault(); jumpToSection(+e.key); }
+    // ── Teclas de função ──
+    else if (e.key === "F1") { e.preventDefault(); bus.emit("shortcuts:open", {}); }
+    else if (e.key === "F2" && !inInput) { e.preventDefault(); renameCurrent(); }
     else if (e.key === "?" && !inInput) { e.preventDefault(); bus.emit("shortcuts:open", {}); }
   });
 
   renderSidebar();
   renderBreadcrumb();
+}
+
+/* Alt+1..9 → salta para as seções principais (como Ctrl+1..9 nas abas do Windows) */
+const SECTIONS = ["home", "tasks", "calendar", "productivity", "tags", "graph", "templates", "settings", "trash"];
+function jumpToSection(n) {
+  const route = SECTIONS[n - 1];
+  if (route) navigate(route);
+}
+
+/* F2 → renomeia a página ou database atual */
+async function renameCurrent() {
+  const { name, params } = parseHash();
+  if (name === "page" && params.id) {
+    const p = getPage(params.id);
+    if (!p) return;
+    const title = await promptDialog({ title: "Renomear página", value: p.title || "" });
+    if (title != null) { updatePage(p.id, { title }); }
+  } else if (name === "db" && params.id) {
+    const d = getDatabase(params.id);
+    if (!d) return;
+    const nm = await promptDialog({ title: "Renomear database", value: d.name || "" });
+    if (nm != null) { updateDatabase(d.id, { name: nm }); }
+  } else {
+    toast("Abra uma página ou database para renomear (F2)", { type: "warn" });
+  }
 }

@@ -215,24 +215,48 @@ function openQuickCapture() {
   setTimeout(() => input.focus(), 50);
 }
 
-/* ── Folha de atalhos ── */
+/* ── Folha de atalhos (estilo Windows) ── */
 function showShortcuts() {
-  const rows = [
-    ["Command palette", `${modKey} K`],
-    ["Captura rápida", `${modKey} ⇧ N`],
-    ["Alternar sidebar", `${modKey} \\`],
-    ["Alternar tema", `${modKey} ⇧ L`],
-    ["Blocos: menu slash", "/"],
-    ["Wiki-link", "[["],
-    ["Duplicar bloco", `${modKey} D`],
-    ["Mover bloco", `${modKey} ⇧ ↑↓`],
-    ["Negrito / Itálico", `${modKey} B · ${modKey} I`],
-    ["Esta folha", "?"],
+  const groups = [
+    ["Geral", [
+      ["Command palette", `${modKey} K`],
+      ["Localizar / Buscar", `${modKey} F`],
+      ["Salvar (auto)", `${modKey} S`],
+      ["Imprimir / Exportar PDF", `${modKey} P`],
+      ["Configurações", `${modKey} ,`],
+      ["Captura rápida", `${modKey} ⇧ N`],
+      ["Alternar sidebar", `${modKey} \\`],
+      ["Alternar tema", `${modKey} ⇧ L`],
+      ["Ajuda / esta folha", "F1 · ?"],
+    ]],
+    ["Navegação", [
+      ["Voltar", "Alt ←"],
+      ["Avançar", "Alt →"],
+      ["Início (dashboard)", "Alt Home"],
+      ["Ir para seção 1–9", "Alt 1…9"],
+      ["Renomear página/database", "F2"],
+    ]],
+    ["Editor de blocos", [
+      ["Desfazer", `${modKey} Z`],
+      ["Refazer", `${modKey} Y · ${modKey} ⇧ Z`],
+      ["Duplicar bloco", `${modKey} D`],
+      ["Mover bloco", `${modKey} ⇧ ↑↓`],
+      ["Menu de blocos", "/"],
+      ["Menção @página / @data", "@"],
+      ["Wiki-link", "[["],
+      ["Negrito · Itálico · Sublinhado", `${modKey} B · I · U`],
+    ]],
   ];
-  const body = h("div", { style: "display:grid;grid-template-columns:1fr auto;gap:8px 24px;padding:4px 0 12px" });
-  rows.forEach(([label, keys]) => {
-    body.appendChild(h("span", { style: "font-size:var(--fs-sm);color:var(--text-2)" }, label));
-    body.appendChild(h("kbd", {}, keys));
+  const body = h("div", { style: "display:flex;flex-direction:column;gap:16px;padding:2px 0 8px" });
+  groups.forEach(([title, rows]) => {
+    const grid = h("div", { style: "display:grid;grid-template-columns:1fr auto;gap:7px 24px" });
+    rows.forEach(([label, keys]) => {
+      grid.appendChild(h("span", { style: "font-size:var(--fs-sm);color:var(--text-2)" }, label));
+      grid.appendChild(h("kbd", {}, keys));
+    });
+    body.appendChild(h("div", {},
+      h("div", { style: "font-size:var(--fs-xs);font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text-faint);margin-bottom:8px" }, title),
+      grid));
   });
-  showModal({ title: "Atalhos de teclado", body, width: 420 });
+  showModal({ title: "⌨ Atalhos de teclado", body, width: 460 });
 }
