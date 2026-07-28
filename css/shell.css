@@ -27,9 +27,28 @@
 .ws-switcher:hover { background: var(--surface-hover); }
 .ws-logo { color: var(--accent); font-size: 15px; }
 
-.sidebar-actions { padding: 0 var(--sp-2) var(--sp-2); }
+/* Corpo da sidebar: ÚNICO scroller. A roda do mouse rola tudo junto (ações,
+   páginas, databases e rodapé), independentemente de onde o cursor esteja. */
+.sidebar-body {
+  flex: 1; min-height: 0;
+  overflow-y: auto; overscroll-behavior: contain;
+  display: flex; flex-direction: column;
+  scrollbar-width: thin; scrollbar-color: var(--border-strong) transparent;
+}
+.sidebar-body::-webkit-scrollbar { width: 9px; }
+.sidebar-body::-webkit-scrollbar-track { background: transparent; }
+.sidebar-body::-webkit-scrollbar-thumb {
+  background: transparent; border-radius: 6px;
+  border: 3px solid transparent; background-clip: content-box;
+  transition: background var(--t-fast);
+}
+.sidebar-body:hover::-webkit-scrollbar-thumb { background: var(--border-strong); background-clip: content-box; }
+.sidebar-body::-webkit-scrollbar-thumb:hover { background: var(--text-faint); background-clip: content-box; }
 
-.sidebar-scroll { flex: 1; overflow-y: auto; padding: 0 var(--sp-2); min-height: 0; }
+.sidebar-actions { padding: 0 var(--sp-2) var(--sp-2); flex-shrink: 0; }
+
+/* já não rola sozinho — faz parte do fluxo do .sidebar-body */
+.sidebar-scroll { flex: 0 0 auto; padding: 0 var(--sp-2); }
 
 .sidebar-section { margin-bottom: var(--sp-2); }
 .section-title {
@@ -79,9 +98,12 @@
 }
 .sidebar-item:hover .si-actions { display: flex; }
 
+/* margin-top:auto → fica colado no rodapé quando sobra espaço,
+   e rola junto com o resto quando a lista fica longa */
 .sidebar-foot {
   padding: var(--sp-2);
   border-top: 1px solid var(--border);
+  margin-top: auto; flex-shrink: 0;
 }
 .local-badge {
   margin-top: var(--sp-2);

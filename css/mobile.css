@@ -29,6 +29,11 @@
   }
   .app.sidebar-collapsed .sidebar { margin-left: 0; }
   .app.drawer-open .sidebar { transform: translateX(0); }
+  /* rolagem com inércia no drawer + espaço para a barra inferior */
+  .sidebar-body {
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
 
   .drawer-scrim {
     position: fixed; inset: 0; z-index: 55;
