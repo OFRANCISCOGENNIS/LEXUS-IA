@@ -75,9 +75,33 @@ export function renderSidebar() {
   favList.innerHTML = "";
   favs.forEach((p) => favList.appendChild(pageItem(p, route.name === "page" && route.params.id === p.id)));
 
+  // renderização em lotes: nenhuma página fica de fora, e listas enormes não
+  // travam o primeiro paint — um sentinela carrega +80 conforme a barra rola
   pagesTree.innerHTML = "";
-  pages.slice(0, 60).forEach((p) =>
-    pagesTree.appendChild(pageItem(p, route.name === "page" && route.params.id === p.id)));
+  const CHUNK = 80;
+  let rendered = 0;
+  const isActive = (p) => route.name === "page" && route.params.id === p.id;
+  const renderChunk = () => {
+    const frag = document.createDocumentFragment();
+    pages.slice(rendered, rendered + CHUNK).forEach((p) => frag.appendChild(pageItem(p, isActive(p))));
+    rendered = Math.min(rendered + CHUNK, pages.length);
+    pagesTree.appendChild(frag);
+    if (rendered < pages.length) {
+      const sentinel = h("div", { style: "height:1px", dataset: { sentinel: "1" } });
+      pagesTree.appendChild(sentinel);
+      const io = new IntersectionObserver((entries) => {
+        if (entries.some((e) => e.isIntersecting)) { io.disconnect(); sentinel.remove(); renderChunk(); }
+      }, { root: document.querySelector(".sidebar-body"), rootMargin: "300px" });
+      io.observe(sentinel);
+    }
+  };
+  const dropSentinel = () => { if (pagesTree.lastElementChild?.dataset?.sentinel) pagesTree.lastElementChild.remove(); };
+  renderChunk();
+  // página ativa além do primeiro lote → garante que ela exista no DOM
+  if (route.name === "page") {
+    const idx = pages.findIndex((p) => p.id === route.params.id);
+    while (idx >= rendered && rendered < pages.length) { dropSentinel(); renderChunk(); }
+  }
   if (!pages.length)
     pagesTree.appendChild(h("div", { style: "padding:4px 10px;font-size:var(--fs-xs);color:var(--text-faint)" }, "Nenhuma página ainda"));
 

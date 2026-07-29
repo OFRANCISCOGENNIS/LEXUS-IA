@@ -331,14 +331,83 @@ export function pageText(p) {
 
 export function pageWordCount(p) { return countWords(pageText(p)); }
 
+/* ── Índice de busca: texto cacheado + índice invertido (token → páginas) ──
+   Sem ele, cada tecla no palette reconstruía o texto de TODAS as páginas.
+   Com ele, a digitação só examina páginas candidatas que contêm os termos. */
+const textCache = new Map();  // pageId → texto minúsculo
+const postings = new Map();   // token → Set(pageId)
+const pageTokens = new Map(); // pageId → Set(token), para remoção incremental
+let indexReady = false;
+
+function tokenize(s) {
+  const out = new Set();
+  for (const m of s.toLowerCase().matchAll(/[\p{L}\p{N}]{2,}/gu)) out.add(m[0]);
+  return out;
+}
+
+function unindexPage(id) {
+  textCache.delete(id);
+  const toks = pageTokens.get(id);
+  if (!toks) return;
+  toks.forEach((t) => {
+    const s = postings.get(t);
+    if (s) { s.delete(id); if (!s.size) postings.delete(t); }
+  });
+  pageTokens.delete(id);
+}
+
+function indexPage(p) {
+  unindexPage(p.id);
+  if (!p || p.archived) return;
+  const text = pageText(p).toLowerCase();
+  textCache.set(p.id, text);
+  const toks = tokenize(text);
+  pageTokens.set(p.id, toks);
+  toks.forEach((t) => {
+    let s = postings.get(t);
+    if (!s) postings.set(t, (s = new Set()));
+    s.add(p.id);
+  });
+}
+
+function ensureIndex() {
+  if (indexReady) return;
+  textCache.clear(); postings.clear(); pageTokens.clear();
+  for (const p of pages.values()) indexPage(p);
+  indexReady = true;
+}
+
+bus.on("pages:changed", (e) => {
+  if (!indexReady) return;
+  if (e?.type === "delete") { unindexPage(e.id); return; }
+  const p = e?.id ? pages.get(e.id) : null;
+  if (p) indexPage(p);
+  else indexReady = false; // import/lote → reconstrói na próxima busca
+});
+
 export function searchAll(query, { limit = 30 } = {}) {
   const q = query.trim().toLowerCase();
   if (!q) return [];
+  ensureIndex();
+
+  // candidatas: interseção das páginas que têm cada termo (match parcial,
+  // igual à semântica de substring da busca original)
+  let candidates = null;
+  for (const term of tokenize(q)) {
+    const withTerm = new Set();
+    for (const [tok, ids] of postings) {
+      if (tok.includes(term)) ids.forEach((id) => withTerm.add(id));
+    }
+    candidates = candidates ? new Set([...candidates].filter((id) => withTerm.has(id))) : withTerm;
+    if (!candidates.size) break;
+  }
+
   const results = [];
-  for (const p of pages.values()) {
+  const scan = candidates ? [...candidates].map((id) => pages.get(id)).filter(Boolean) : [...pages.values()];
+  for (const p of scan) {
     if (p.archived) continue;
     const title = (p.title || "").toLowerCase();
-    const text = pageText(p).toLowerCase();
+    const text = textCache.get(p.id) ?? pageText(p).toLowerCase();
     const ti = title.indexOf(q);
     const ci = text.indexOf(q);
     if (ti >= 0 || ci >= 0) {

@@ -47,6 +47,7 @@ export default {
   },
   unmount() {
     closeMenus();
+    state?._virtCleanup?.();
     document.getElementById("topbar-actions").innerHTML = "";
     state = null;
   },
@@ -380,6 +381,7 @@ function visibleRows() {
 }
 
 function renderView() {
+  state._virtCleanup?.();
   const view = currentView();
   const vp = state.viewportEl;
   vp.innerHTML = "";
@@ -562,7 +564,14 @@ function renderTable(root) {
     h("button", { class: "th-add-btn", title: "Nova propriedade", onclick: (e) => addColumnMenu(e) }, "＋")));
 
   const colCount = db.properties.length + 1;
-  const childrenOf = (id) => db.rows.filter((r) => r.parentId === id);
+  // mapa pai → filhos calculado uma vez (evita varrer todas as linhas por linha)
+  const kidsMap = new Map();
+  rows.forEach((r) => {
+    if (!r.parentId) return;
+    if (!kidsMap.has(r.parentId)) kidsMap.set(r.parentId, []);
+    kidsMap.get(r.parentId).push(r);
+  });
+  const childrenOf = (id) => kidsMap.get(id) || [];
   const buildRow = (row, depth = 0) => {
     const tr = h("tr", { dataset: { rowId: row.id } });
     db.properties.forEach((p, pi) => {
@@ -594,16 +603,22 @@ function renderTable(root) {
       }, "⋯")));
     return tr;
   };
-  // renderiza uma linha e, se expandida, seus sub-itens recursivamente
-  const appendTree = (tbody, row, depth) => {
-    tbody.appendChild(buildRow(row, depth));
-    if (state.expanded.has(row.id)) childrenOf(row.id).forEach((c) => appendTree(tbody, c, depth + 1));
+  // achata a árvore visível (respeitando sub-itens expandidos) numa lista plana
+  const flat = [];
+  const pushTree = (row, depth) => {
+    flat.push({ row, depth });
+    if (state.expanded.has(row.id)) childrenOf(row.id).forEach((c) => pushTree(c, depth + 1));
   };
-
-  const tbody = h("tbody", {});
   const topRows = rows.filter((r) => !r.parentId); // sub-itens aninham sob os pais
   const groupProp = view.groupBy ? db.properties.find((p) => p.id === view.groupBy) : null;
+
+  const tbody = h("tbody", {});
+  const VIRT_MIN = 150;
   if (groupProp) {
+    const appendTree = (row, depth) => {
+      tbody.appendChild(buildRow(row, depth));
+      if (state.expanded.has(row.id)) childrenOf(row.id).forEach((c) => appendTree(c, depth + 1));
+    };
     for (const g of groupRows(topRows, groupProp)) {
       const headTr = h("tr", { class: "db-group-row" });
       headTr.appendChild(h("td", { colspan: colCount },
@@ -611,10 +626,16 @@ function renderTable(root) {
           g.option ? h("span", { class: chipClass(g.option.color) }, g.option.name) : h("span", { class: "chip" }, "Sem valor"),
           h("span", { class: "db-group-count" }, String(g.rows.length)))));
       tbody.appendChild(headTr);
-      g.rows.forEach((row) => appendTree(tbody, row, 0));
+      g.rows.forEach((row) => appendTree(row, 0));
     }
   } else {
-    topRows.forEach((row) => appendTree(tbody, row, 0));
+    topRows.forEach((row) => pushTree(row, 0));
+    if (flat.length <= VIRT_MIN) {
+      flat.forEach(({ row, depth }) => tbody.appendChild(buildRow(row, depth)));
+    } else {
+      // tabelas grandes: só as linhas visíveis existem no DOM
+      setupVirtualTable(tbody, flat, buildRow, colCount);
+    }
   }
 
   root.appendChild(h("div", { class: "db-table-wrap" },
@@ -629,6 +650,49 @@ function renderTable(root) {
         ? "Nada corresponde ao filtro atual."
         : "Sem linhas ainda — clique em “Nova linha”.")));
   }
+}
+
+/* ── Virtualização: renderiza só a janela visível (~40 linhas) + espaçadores.
+   Uma tabela de 100.000 linhas rola a 60fps porque o DOM nunca passa de
+   algumas dezenas de <tr>. A rolagem é a do próprio #view. ── */
+function setupVirtualTable(tbody, flat, buildRow, colCount) {
+  state._virtCleanup?.();
+  const scroller = state.container.closest("#view") || document.getElementById("view") || document.scrollingElement;
+  let rowH = 37; // calibrado com a primeira linha real após o paint
+  const BUF = 12;
+  const spacer = () => h("tr", { class: "virt-spacer" }, h("td", { colspan: colCount, style: "padding:0;border:0;height:0" }));
+  const top = spacer(), bottom = spacer();
+  tbody.append(top, bottom);
+  let start = -1, count = -1;
+
+  const update = () => {
+    if (!state) return;
+    const total = flat.length;
+    const cnt = Math.min(total, Math.ceil((scroller.clientHeight || innerHeight) / rowH) + BUF * 2);
+    // o topo do tbody já inclui o espaçador ⇒ a linha virtual i começa em tbodyTop + i*rowH
+    const scTop = scroller.getBoundingClientRect().top;
+    const tbodyTop = tbody.getBoundingClientRect().top;
+    let s = Math.max(0, Math.floor((scTop - tbodyTop) / rowH) - BUF);
+    s = Math.min(s, Math.max(0, total - cnt));
+    if (s === start && cnt === count) return;
+    start = s; count = cnt;
+    tbody.querySelectorAll("tr:not(.virt-spacer)").forEach((tr) => tr.remove());
+    const frag = document.createDocumentFragment();
+    flat.slice(s, s + cnt).forEach(({ row, depth }) => frag.appendChild(buildRow(row, depth)));
+    tbody.insertBefore(frag, bottom);
+    top.firstChild.style.height = s * rowH + "px";
+    bottom.firstChild.style.height = Math.max(0, total - s - cnt) * rowH + "px";
+    const first = tbody.querySelector("tr:not(.virt-spacer)");
+    if (first) {
+      const hh = first.getBoundingClientRect().height;
+      if (hh > 10 && Math.abs(hh - rowH) > 1) rowH = hh;
+    }
+  };
+
+  const onScroll = () => update();
+  scroller.addEventListener("scroll", onScroll, { passive: true });
+  state._virtCleanup = () => { scroller.removeEventListener("scroll", onScroll); if (state) state._virtCleanup = null; };
+  requestAnimationFrame(update);
 }
 
 /* agrupa linhas por uma propriedade select (ou checkbox) */

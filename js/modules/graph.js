@@ -241,21 +241,89 @@ function createSim(canvas, tip, P) {
     kick();
   }
 
-  function step() {
-    for (let i = 0; i < nodes.length; i++) {
-      const a = nodes[i];
-      for (let j = i + 1; j < nodes.length; j++) {
-        const b = nodes[j];
-        let dx = a.x - b.x, dy = a.y - b.y;
-        let d2 = dx * dx + dy * dy;
-        if (d2 < 1) { dx = Math.random() - 0.5; dy = Math.random() - 0.5; d2 = 1; }
-        const f = P.repel / d2;
-        const d = Math.sqrt(d2);
-        const fx = (dx / d) * f, fy = (dy / d) * f;
-        a.vx += fx; a.vy += fy; b.vx -= fx; b.vy -= fy;
+  /* ── Barnes-Hut: aproxima grupos distantes pelo centro de massa ──
+     Repulsão exata é O(n²) e trava com centenas de nós; com a quadtree o
+     custo cai para O(n log n) e milhares de nós continuam fluidos. */
+  const BH_MIN = 150, BH_THETA2 = 0.85 * 0.85;
+
+  function buildQuadtree() {
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    for (const n of nodes) {
+      if (n.x < minX) minX = n.x; if (n.x > maxX) maxX = n.x;
+      if (n.y < minY) minY = n.y; if (n.y > maxY) maxY = n.y;
+    }
+    const size = Math.max(maxX - minX, maxY - minY, 1);
+    const root = { x: minX, y: minY, s: size, mass: 0, cx: 0, cy: 0, node: null, kids: null };
+    const insert = (q, n) => {
+      while (true) {
+        if (q.kids) { q.mass++; q.cx += n.x; q.cy += n.y; q = q.kids[quadOf(q, n)]; continue; }
+        if (!q.node && q.mass === 0) { q.node = n; q.mass = 1; q.cx = n.x; q.cy = n.y; return; }
+        // subdivide (limite de profundidade evita loop com nós sobrepostos)
+        if (q.s < 0.5) { q.mass++; q.cx += n.x; q.cy += n.y; return; }
+        const old = q.node; q.node = null;
+        const hs = q.s / 2;
+        q.kids = [
+          { x: q.x, y: q.y, s: hs, mass: 0, cx: 0, cy: 0, node: null, kids: null },
+          { x: q.x + hs, y: q.y, s: hs, mass: 0, cx: 0, cy: 0, node: null, kids: null },
+          { x: q.x, y: q.y + hs, s: hs, mass: 0, cx: 0, cy: 0, node: null, kids: null },
+          { x: q.x + hs, y: q.y + hs, s: hs, mass: 0, cx: 0, cy: 0, node: null, kids: null },
+        ];
+        if (old) { const k = q.kids[quadOf(q, old)]; k.node = old; k.mass = 1; k.cx = old.x; k.cy = old.y; }
+        q.mass++; q.cx += n.x; q.cy += n.y;
+        q = q.kids[quadOf(q, n)];
       }
-      a.vx += (W / 2 - a.x) * P.center;
-      a.vy += (H / 2 - a.y) * P.center;
+    };
+    const quadOf = (q, n) => (n.x >= q.x + q.s / 2 ? 1 : 0) + (n.y >= q.y + q.s / 2 ? 2 : 0);
+    for (const n of nodes) insert(root, n);
+    return root;
+  }
+
+  function bhRepel(n, q, stack) {
+    stack.length = 0;
+    stack.push(q);
+    while (stack.length) {
+      const c = stack.pop();
+      if (!c || c.mass === 0 || c.node === n) continue;
+      const cx = c.cx / c.mass, cy = c.cy / c.mass;
+      let dx = n.x - cx, dy = n.y - cy;
+      let d2 = dx * dx + dy * dy;
+      if (c.kids && (c.s * c.s) / Math.max(d2, 1) > BH_THETA2) {
+        stack.push(c.kids[0], c.kids[1], c.kids[2], c.kids[3]);
+        continue;
+      }
+      if (d2 < 1) { dx = Math.random() - 0.5; dy = Math.random() - 0.5; d2 = 1; }
+      const f = (P.repel * c.mass) / d2;
+      const d = Math.sqrt(d2);
+      n.vx += (dx / d) * f;
+      n.vy += (dy / d) * f;
+    }
+  }
+
+  const bhStack = [];
+  function step() {
+    if (nodes.length > BH_MIN) {
+      const tree = buildQuadtree();
+      for (const a of nodes) {
+        bhRepel(a, tree, bhStack);
+        a.vx += (W / 2 - a.x) * P.center;
+        a.vy += (H / 2 - a.y) * P.center;
+      }
+    } else {
+      for (let i = 0; i < nodes.length; i++) {
+        const a = nodes[i];
+        for (let j = i + 1; j < nodes.length; j++) {
+          const b = nodes[j];
+          let dx = a.x - b.x, dy = a.y - b.y;
+          let d2 = dx * dx + dy * dy;
+          if (d2 < 1) { dx = Math.random() - 0.5; dy = Math.random() - 0.5; d2 = 1; }
+          const f = P.repel / d2;
+          const d = Math.sqrt(d2);
+          const fx = (dx / d) * f, fy = (dy / d) * f;
+          a.vx += fx; a.vy += fy; b.vx -= fx; b.vy -= fy;
+        }
+        a.vx += (W / 2 - a.x) * P.center;
+        a.vy += (H / 2 - a.y) * P.center;
+      }
     }
     edges.forEach((e) => {
       const a = nodes[idIndex.get(e.from)], b = nodes[idIndex.get(e.to)];

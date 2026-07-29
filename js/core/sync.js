@@ -42,8 +42,26 @@ async function getClient() {
 /* ── Criptografia (WebCrypto) ── */
 const enc = new TextEncoder();
 const dec = new TextDecoder();
-const b64 = (buf) => btoa(String.fromCharCode(...new Uint8Array(buf)));
+// base64 em blocos: espalhar um buffer grande em String.fromCharCode estoura a pilha
+const b64 = (buf) => {
+  const u = new Uint8Array(buf);
+  let s = "";
+  for (let i = 0; i < u.length; i += 0x8000) s += String.fromCharCode.apply(null, u.subarray(i, i + 0x8000));
+  return btoa(s);
+};
 const unb64 = (str) => Uint8Array.from(atob(str), (c) => c.charCodeAt(0));
+
+/* gzip antes de criptografar (~5-10× menos tráfego); descompressão detecta
+   o magic number, então payloads antigos sem compressão continuam legíveis */
+async function gzipBytes(bytes) {
+  if (typeof CompressionStream === "undefined") return bytes;
+  const cs = new Blob([bytes]).stream().pipeThrough(new CompressionStream("gzip"));
+  return new Uint8Array(await new Response(cs).arrayBuffer());
+}
+async function gunzipBytes(bytes) {
+  const ds = new Blob([bytes]).stream().pipeThrough(new DecompressionStream("gzip"));
+  return new Uint8Array(await new Response(ds).arrayBuffer());
+}
 
 async function deriveKey(password, email) {
   const base = await crypto.subtle.importKey("raw", enc.encode(password), "PBKDF2", false, ["deriveKey"]);
@@ -53,12 +71,14 @@ async function deriveKey(password, email) {
 }
 async function encryptJSON(obj) {
   const iv = crypto.getRandomValues(new Uint8Array(12));
-  const cipher = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, encKey, enc.encode(JSON.stringify(obj)));
+  const packed = await gzipBytes(enc.encode(typeof obj === "string" ? obj : JSON.stringify(obj)));
+  const cipher = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, encKey, packed);
   return { cipher: b64(cipher), iv: b64(iv) };
 }
 async function decryptJSON(cipherB64, ivB64) {
-  const plain = await crypto.subtle.decrypt({ name: "AES-GCM", iv: unb64(ivB64) }, encKey, unb64(cipherB64));
-  return JSON.parse(dec.decode(plain));
+  const plain = new Uint8Array(await crypto.subtle.decrypt({ name: "AES-GCM", iv: unb64(ivB64) }, encKey, unb64(cipherB64)));
+  const bytes = plain[0] === 0x1f && plain[1] === 0x8b ? await gunzipBytes(plain) : plain;
+  return JSON.parse(dec.decode(bytes));
 }
 
 /* ── Autenticação ── */
@@ -128,17 +148,24 @@ async function fetchRemote() {
   return data || null;
 }
 
-export async function pushNow() {
+let lastPushHash = null;   // hash do último snapshot enviado → evita uploads redundantes
+let lastPulledAt = null;   // updated_at do último pull → evita re-importar sem mudança
+
+export async function pushNow({ force = false } = {}) {
   if (!user || !encKey) return;
+  const snapshot = await exportWorkspace();
+  const json = JSON.stringify(snapshot);
+  const hash = b64(await crypto.subtle.digest("SHA-256", enc.encode(json)));
+  if (!force && hash === lastPushHash) return; // nada mudou desde o último push
   setStatus("syncing");
   try {
-    const snapshot = await exportWorkspace();
-    const { cipher, iv } = await encryptJSON(snapshot);
+    const { cipher, iv } = await encryptJSON(json);
     const c = await getClient();
     const { error } = await c.from(TABLE).upsert({
       user_id: user.id, data: cipher, iv, updated_at: new Date().toISOString(),
     });
     if (error) throw error;
+    lastPushHash = hash;
     setStatus("ready", { at: Date.now() });
   } catch (e) { setStatus("error", { message: e.message }); throw e; }
 }
@@ -148,8 +175,10 @@ export async function pullNow() {
   try {
     const remote = await fetchRemote();
     if (!remote) return;
+    if (remote.updated_at && remote.updated_at === lastPulledAt) return; // remoto inalterado
     const data = await decryptJSON(remote.data, remote.iv);
     await importWorkspace(data, { merge: true }); // remoto vence em conflito por id
+    lastPulledAt = remote.updated_at || null;
     setStatus("ready", { at: Date.now() });
   } catch (e) { setStatus("error", { message: e.message }); }
 }
