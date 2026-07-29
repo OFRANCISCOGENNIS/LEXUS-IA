@@ -10,9 +10,9 @@ O NEXUS é um workspace de produtividade estilo Notion/Craft/Capacities,
 
 | | |
 |---|---|
-| 📝 **Editor de blocos** | Slash menu (`/`), formatação inline, wiki-links `[[...]]` com backlinks, **menções `@página`/`@data`**, colunas, equações (KaTeX), embeds, modo apresentação, drag & drop com FLIP, histórico de versões com diff, sumário (TOC), capas, tags, bloco de gráfico |
+| 📝 **Editor de blocos** | Slash menu (`/`), formatação inline, wiki-links `[[...]]` com backlinks, **menções `@página`/`@data`**, **database inline**, **multi-seleção de blocos** (Esc · Shift+↑↓ · ações em massa), desfazer/refazer, colunas, equações (KaTeX), embeds, modo apresentação, drag & drop com FLIP, histórico de versões com diff, sumário (TOC), capas, tags, bloco de gráfico |
 | ✍ **Modo foco/máquina de escrever** | Isola o parágrafo atual, HUD com contador de palavras e meta de escrita, scroll centralizado |
-| ▦ **Databases** | Views Tabela, Kanban, Galeria, Lista, Calendário e **Timeline/Gantt**; propriedades select, data, número, URL, checkbox, **fórmula, relação, rollup**; **sub-itens** aninhados; filtros simples e avançados (E/OU), ordenação, agrupamento, **automações locais** (gatilho → ação), export CSV |
+| ▦ **Databases** | Views Tabela (virtualizada — dezenas de milhares de linhas), Kanban, Galeria, Lista, Calendário e **Timeline/Gantt**; propriedades select, data, número, URL, checkbox, **fórmula, relação, rollup, criado/editado em**; **sub-itens** aninhados; **templates de linha**; filtros simples e avançados (E/OU), ordenação, agrupamento, **automações locais** (gatilho → ação), export CSV |
 | ✓ **Tarefas & Projetos** | Agrega prazos das databases e checklists das páginas em Hoje/Semana/Atrasadas |
 | ◷ **Produtividade** | Pomodoro, hábitos com heatmap, lembretes locais |
 | 🏷 **Tags & Coleções** | Tags por página, páginas de tag automáticas e coleções inteligentes |

@@ -6,7 +6,7 @@ import {
   getPage, updatePage, touchPageBlocks, makeBlock, listPages, createPage,
   snapshotPage, listVersions, restoreVersion, backlinksTo, unlinkedMentions,
   pageWordCount, deletePage, duplicatePage, getSetting, setSetting,
-  listDatabases, getDatabase,
+  listDatabases, getDatabase, createDatabase, makeRow, touchDatabase,
 } from "../core/store.js";
 import { bus } from "../core/bus.js";
 import { navigate } from "../core/router.js";
@@ -50,6 +50,7 @@ const BLOCK_DEFS = [
   { type: "toc", icon: "☰", title: "Sumário", desc: "Índice automático dos títulos", kw: "sumario toc indice tabela conteudo" },
   { type: "chart", icon: "📊", title: "Gráfico", desc: "Barras a partir de uma database", kw: "grafico chart barra kpi dashboard database" },
   { type: "image", icon: "🖼", title: "Imagem", desc: "Envie ou cole uma imagem", kw: "imagem foto image" },
+  { type: "dbview", icon: "▦", title: "Database inline", desc: "Embuta uma database viva na página", kw: "database inline tabela linked view embutir base" },
 ];
 
 const TEXTUAL = new Set(["p", "h1", "h2", "h3", "h4", "bulleted", "numbered", "todo", "quote", "callout", "toggle"]);
@@ -197,6 +198,10 @@ export default {
     };
     addEventListener("keydown", onHistKey, true);
     state.cleanups.push(() => removeEventListener("keydown", onHistKey, true));
+
+    // multi-seleção de blocos: teclas globais + limpeza
+    addEventListener("keydown", onSelectionKey);
+    state.cleanups.push(() => { removeEventListener("keydown", onSelectionKey); clearBlockSelection(); selBar?.remove(); selBar = null; });
   },
   unmount() {
     hideFmtBar();
@@ -327,6 +332,123 @@ function renderBlocks() {
       blocksEl.appendChild(renderBlock(b, { num }));
     }
   });
+  paintSelection();
+}
+
+/* ═══════════ Multi-seleção de blocos ═══════════
+   Esc seleciona o bloco atual; Shift+↑/↓ estende; Shift+clique seleciona a
+   faixa; Delete/Backspace exclui, Ctrl+D duplica, Enter volta a editar. */
+const blockSel = { ids: new Set(), anchor: null };
+let selBar = null;
+
+function clearBlockSelection() {
+  if (!blockSel.ids.size) return;
+  blockSel.ids.clear(); blockSel.anchor = null;
+  paintSelection();
+}
+
+function paintSelection() {
+  if (!state?.blocksEl) return;
+  state.blocksEl.querySelectorAll(".block.selected").forEach((el) => el.classList.remove("selected"));
+  blockSel.ids.forEach((id) => {
+    state.blocksEl.querySelector(`[data-block-id="${id}"]`)?.classList.add("selected");
+  });
+  updateSelBar();
+}
+
+function selectOnlyBlock(id) {
+  blockSel.ids = new Set([id]); blockSel.anchor = id;
+  paintSelection();
+}
+
+/* estende da âncora até o alvo — apenas entre irmãos da mesma lista */
+function extendSelectionTo(id) {
+  const a = findBlock(blockSel.anchor || id), b = findBlock(id);
+  if (!a || !b || a.list !== b.list) { selectOnlyBlock(id); return; }
+  const [i, j] = a.index <= b.index ? [a.index, b.index] : [b.index, a.index];
+  blockSel.ids = new Set(a.list.slice(i, j + 1).map((x) => x.id));
+  paintSelection();
+}
+
+function selectedBlocksSorted() {
+  const f = findBlock(blockSel.anchor);
+  if (!f) return [];
+  return f.list.map((b, i) => ({ b, i })).filter(({ b }) => blockSel.ids.has(b.id));
+}
+
+function deleteSelectedBlocks() {
+  const f = findBlock(blockSel.anchor);
+  if (!f) return;
+  const keep = f.list.filter((b) => !blockSel.ids.has(b.id));
+  f.list.length = 0; f.list.push(...keep);
+  if (!state.page.blocks.length) state.page.blocks.push(makeBlock());
+  clearBlockSelection();
+  commit({ structural: true });
+  toast("Blocos excluídos", { duration: 1200 });
+}
+
+function duplicateSelectedBlocks() {
+  const items = selectedBlocksSorted();
+  if (!items.length) return;
+  const f = findBlock(blockSel.anchor);
+  const copies = items.map(({ b }) => {
+    const c = structuredClone(b); c.id = uid("b");
+    (c.children || []).forEach((k) => (k.id = uid("b")));
+    return c;
+  });
+  const after = Math.max(...items.map(({ i }) => i));
+  f.list.splice(after + 1, 0, ...copies);
+  blockSel.ids = new Set(copies.map((c) => c.id));
+  blockSel.anchor = copies[0].id;
+  commit({ structural: true });
+}
+
+/* move a seleção como bloco único (↑/↓) ou estende com Shift */
+function stepSelection(dir, extend) {
+  const f = findBlock(blockSel.anchor);
+  if (!f) return;
+  if (extend) {
+    const idxs = f.list.map((b, i) => (blockSel.ids.has(b.id) ? i : -1)).filter((i) => i >= 0);
+    const edge = dir > 0 ? Math.max(...idxs) + 1 : Math.min(...idxs) - 1;
+    if (edge < 0 || edge >= f.list.length) return;
+    extendSelectionTo(f.list[edge].id);
+  } else {
+    const target = clamp(f.index + dir, 0, f.list.length - 1);
+    selectOnlyBlock(f.list[target].id);
+  }
+  const el = state.blocksEl.querySelector(`[data-block-id="${blockSel.anchor}"]`);
+  el?.scrollIntoView({ block: "nearest" });
+}
+
+function updateSelBar() {
+  const n = blockSel.ids.size;
+  if (!n) { selBar?.remove(); selBar = null; return; }
+  if (!selBar) {
+    selBar = h("div", { class: "sel-bar" },
+      h("span", { class: "sel-count" }),
+      h("button", { class: "btn ghost sm", onclick: () => duplicateSelectedBlocks() }, "⧉ Duplicar"),
+      h("button", { class: "btn ghost sm sel-danger", onclick: () => deleteSelectedBlocks() }, "🗑 Excluir"),
+      h("button", { class: "icon-btn", "aria-label": "Limpar seleção", onclick: () => clearBlockSelection() }, "✕"));
+    document.getElementById("overlay-root").appendChild(selBar);
+  }
+  selBar.querySelector(".sel-count").textContent = `${n} ${n === 1 ? "bloco" : "blocos"}`;
+}
+
+function onSelectionKey(e) {
+  if (!state || !blockSel.ids.size) return;
+  if (document.activeElement?.isContentEditable) return; // digitando → seleção não intercepta
+  const mod = isMac ? e.metaKey : e.ctrlKey;
+  if (e.key === "Escape") { e.preventDefault(); clearBlockSelection(); }
+  else if (e.key === "Delete" || e.key === "Backspace") { e.preventDefault(); deleteSelectedBlocks(); }
+  else if (mod && e.key.toLowerCase() === "d") { e.preventDefault(); duplicateSelectedBlocks(); }
+  else if (e.key === "ArrowDown") { e.preventDefault(); stepSelection(+1, e.shiftKey); }
+  else if (e.key === "ArrowUp") { e.preventDefault(); stepSelection(-1, e.shiftKey); }
+  else if (e.key === "Enter") {
+    e.preventDefault();
+    const id = blockSel.anchor;
+    clearBlockSelection();
+    focusBlock(id, false);
+  }
 }
 
 function renderBlock(block, { num = 0, inToggle = false } = {}) {
@@ -336,6 +458,14 @@ function renderBlock(block, { num = 0, inToggle = false } = {}) {
   });
   if (block.type === "callout") el.dataset.color = block.props?.color || "";
   if (block.type === "todo" && block.props?.checked) el.classList.add("done");
+
+  // Shift+clique: seleciona a faixa entre a âncora e este bloco
+  el.addEventListener("click", (e) => {
+    if (!e.shiftKey || inToggle) return;
+    e.preventDefault();
+    getSelection()?.removeAllRanges();
+    blockSel.ids.size ? extendSelectionTo(block.id) : selectOnlyBlock(block.id);
+  });
 
   // handle
   if (!state.page.locked && !inToggle) {
@@ -412,6 +542,8 @@ function renderBlock(block, { num = 0, inToggle = false } = {}) {
     el.appendChild(renderEquation(block)); el.tabIndex = -1;
   } else if (block.type === "columns") {
     el.appendChild(renderColumns(block)); el.tabIndex = -1;
+  } else if (block.type === "dbview") {
+    el.appendChild(renderDbView(block)); el.tabIndex = -1;
   } else if (block.type === "image") {
     el.appendChild(renderImage(block));
   } else if (block.type === "code") {
@@ -498,6 +630,15 @@ function bindContent(content, block) {
 function onBlockKeydown(e, content, block) {
   if (slashState.open || wikiState.open || mentionState.open) {
     if (["ArrowDown", "ArrowUp", "Enter", "Escape", "Tab"].includes(e.key)) return; // menus tratam
+  }
+
+  // Esc dentro do bloco → sai da edição e seleciona o bloco (modo seleção)
+  if (e.key === "Escape" && !state.focusMode) {
+    e.preventDefault();
+    e.stopPropagation(); // sem isto, o mesmo Esc chega ao listener global e desfaz a seleção
+    content.blur();
+    selectOnlyBlock(block.id);
+    return;
   }
 
   const found = findBlock(block.id);
@@ -992,6 +1133,111 @@ function renderSubpage(block) {
     h("span", { class: "sp-arrow" }, "›"));
 }
 
+/* ═══════════ Database inline (view viva dentro da página) ═══════════ */
+function renderDbView(block) {
+  const wrap = h("div", { class: "block-dbview", contenteditable: "false", style: "flex:1;min-width:0" });
+  const db = block.props?.dbId ? getDatabase(block.props.dbId) : null;
+
+  if (!db) {
+    wrap.appendChild(h("button", {
+      class: "dbv-pick",
+      onclick: (e) => {
+        const dbs = listDatabases();
+        showMenu(e.currentTarget, [
+          { label: "Embutir database" },
+          ...dbs.map((d) => ({ icon: d.icon || "▦", title: d.name, action: () => { block.props = { dbId: d.id }; commit({ structural: true }); } })),
+          { sep: true },
+          { icon: "＋", title: "Criar nova database", action: () => {
+            const nd = createDatabase({ name: "Nova database" });
+            block.props = { dbId: nd.id };
+            commit({ structural: true });
+          } },
+        ]);
+      },
+    }, "▦ Escolher database…"));
+    return wrap;
+  }
+
+  const commitDb = () => touchDatabase(db.id);
+  wrap.appendChild(h("div", { class: "dbv-head" },
+    h("button", { class: "dbv-title", onclick: () => navigate("db", db.id) }, (db.icon || "▦") + " " + db.name),
+    h("span", { class: "dbv-count" }, `${db.rows.length} ${db.rows.length === 1 ? "item" : "itens"}`),
+    h("button", { class: "btn ghost sm", onclick: () => navigate("db", db.id) }, "↗ Abrir")));
+
+  const props = db.properties.slice(0, 5);
+  const table = h("table", { class: "dbv-table" });
+  const trh = h("tr", {});
+  props.forEach((p) => trh.appendChild(h("th", {}, p.name)));
+  table.appendChild(h("thead", {}, trh));
+  const tbody = h("tbody", {});
+  const MAX = 50;
+  db.rows.slice(0, MAX).forEach((row) => {
+    const tr = h("tr", {});
+    props.forEach((p, pi) => tr.appendChild(h("td", {}, dbvCell(db, row, p, pi === 0, commitDb))));
+    tbody.appendChild(tr);
+  });
+  table.appendChild(tbody);
+  wrap.appendChild(h("div", { class: "dbv-scroll" }, table));
+  if (db.rows.length > MAX) {
+    wrap.appendChild(h("button", { class: "dbv-more", onclick: () => navigate("db", db.id) },
+      `… mais ${db.rows.length - MAX} — abrir a database completa`));
+  }
+
+  if (!state.page.locked) {
+    const input = h("input", { class: "dbv-add", placeholder: "＋ Novo item — Enter para adicionar" });
+    input.addEventListener("keydown", (e) => {
+      e.stopPropagation();
+      if (e.key === "Enter" && input.value.trim()) {
+        db.rows.push(makeRow(db, { title: input.value.trim() }));
+        commitDb();
+        commit({ structural: true });
+      }
+      if (e.key === "Escape") input.blur();
+    });
+    wrap.appendChild(input);
+  }
+  return wrap;
+}
+
+function dbvCell(db, row, p, isTitle, commitDb) {
+  const v = row.values[p.id];
+  if (isTitle || p.type === "title") {
+    const c = h("div", { class: "dbv-cell-title", contenteditable: "true", spellcheck: "false" });
+    c.textContent = row.values.title || "";
+    c.addEventListener("blur", () => {
+      const t = c.textContent.trim();
+      if (t !== (row.values.title || "")) { row.values.title = t; row.updatedAt = Date.now(); commitDb(); }
+    });
+    c.addEventListener("keydown", (e) => { e.stopPropagation(); if (e.key === "Enter") { e.preventDefault(); c.blur(); } });
+    return c;
+  }
+  if (p.type === "select") {
+    const o = p.options?.find((x) => x.id === v);
+    return h("button", {
+      class: o ? `chip c-${o.color || "gray"}` : "dbv-empty",
+      onclick: (e) => {
+        e.stopPropagation();
+        showMenu(e.currentTarget, (p.options || []).map((op) => ({
+          icon: "◉", title: op.name,
+          action: () => { row.values[p.id] = op.id; row.updatedAt = Date.now(); commitDb(); commit({ structural: true }); },
+        })));
+      },
+    }, o ? o.name : "—");
+  }
+  if (p.type === "checkbox") {
+    const c = h("div", {
+      class: "todo-check" + (v ? " checked" : ""),
+      onclick: () => { row.values[p.id] = !row.values[p.id]; row.updatedAt = Date.now(); commitDb(); c.classList.toggle("checked", row.values[p.id]); },
+    }, "✓");
+    return c;
+  }
+  if (p.type === "date") return h("span", { class: v ? "chip" : "dbv-empty" }, v ? "📅 " + fmtDate(v + "T12:00:00", { day: "numeric", month: "short" }) : "—");
+  if (p.type === "created" || p.type === "updated")
+    return h("span", { class: "chip" }, fmtDate(p.type === "created" ? row.createdAt : row.updatedAt, { day: "numeric", month: "short" }));
+  if (p.type === "number") return h("span", {}, v != null && v !== "" ? Number(v).toLocaleString("pt-BR") : "—");
+  return h("span", { class: v ? "" : "dbv-empty" }, v ? String(v).slice(0, 42) : "—");
+}
+
 /* ═══════════ Vídeo / Áudio local ═══════════ */
 function renderMedia(block) {
   if (block.props?.src) {
@@ -1339,6 +1585,7 @@ function applySlash(def) {
   if (def.type === "bookmark") block.props = { url: "" };
   if (def.type === "embed") block.props = { url: "" };
   if (def.type === "equation") block.props = { latex: "" };
+  if (def.type === "dbview") block.props = {};
   if (def.type === "columns") { block.children = [{ id: uid("b"), type: "column", props: {}, children: [makeBlock()] }, { id: uid("b"), type: "column", props: {}, children: [makeBlock()] }]; }
   if (def.type === "subpage") {
     const child = createPage({ title: "Sub-página", parentId: state.page.id });
@@ -1347,7 +1594,7 @@ function applySlash(def) {
   closeSlash();
 
   // blocos não-textuais ganham um parágrafo em branco logo abaixo, para o fluxo continuar
-  const NEEDS_TRAILING = new Set(["table", "progress", "button", "subpage", "bookmark", "chart", "toc", "divider", "image", "video", "audio", "embed", "equation", "columns"]);
+  const NEEDS_TRAILING = new Set(["table", "progress", "button", "subpage", "bookmark", "chart", "toc", "divider", "image", "video", "audio", "embed", "equation", "columns", "dbview"]);
   let trailingId = null;
   if (NEEDS_TRAILING.has(def.type)) {
     const found = findBlock(block.id);
@@ -1937,6 +2184,7 @@ function staticBlock(b) {
     case "image": return b.props?.src ? h("img", { class: "ps-img", src: b.props.src }) : "";
     case "divider": return h("hr");
     case "equation": { const d = h("div", { class: "ps-eq" }); loadKatex().then((k) => { try { k.render(b.props?.latex || "", d, { displayMode: true, throwOnError: false }); } catch {} }).catch(() => { d.textContent = b.props?.latex || ""; }); return d; }
+    case "dbview": { const d = b.props?.dbId ? getDatabase(b.props.dbId) : null; return d ? h("p", { class: "ps-p" }, `▦ ${d.name} · ${d.rows.length} itens`) : ""; }
     default: return safe ? h("p", { class: "ps-p", html: safe }) : "";
   }
 }

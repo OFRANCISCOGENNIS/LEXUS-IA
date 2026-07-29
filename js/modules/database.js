@@ -19,7 +19,13 @@ const PROP_TYPES = [
   { type: "formula", icon: "∑", name: "Fórmula" },
   { type: "relation", icon: "⇄", name: "Relação" },
   { type: "rollup", icon: "Σ", name: "Rollup" },
+  { type: "created", icon: "🕐", name: "Criado em" },
+  { type: "updated", icon: "✎", name: "Editado em" },
 ];
+/* propriedades calculadas — não têm valor em row.values e não são editáveis */
+const AUTO_PROPS = new Set(["created", "updated"]);
+const COMPUTED_PROPS = new Set(["formula", "rollup", "created", "updated"]);
+const autoValue = (row, prop) => prop.type === "created" ? row.createdAt : row.updatedAt;
 const TYPE_ICON = Object.fromEntries(PROP_TYPES.map((t) => [t.type, t.icon]));
 TYPE_ICON.title = "T";
 const CHIP_COLORS = ["gray", "blue", "green", "amber", "red", "purple"];
@@ -81,6 +87,7 @@ function exportCsv(db) {
   const header = props.map((p) => `"${p.name.replace(/"/g, '""')}"`).join(",");
   const lines = db.rows.map((r) => props.map((p) => {
     let v = r.values[p.id];
+    if (AUTO_PROPS.has(p.type)) v = new Date(autoValue(r, p)).toLocaleString("pt-BR");
     if (p.type === "select") v = p.options?.find((o) => o.id === v)?.name || "";
     if (p.type === "multiselect") v = (v || []).map((id) => p.options?.find((o) => o.id === id)?.name).filter(Boolean).join("; ");
     if (p.type === "checkbox") v = v ? "sim" : "não";
@@ -267,7 +274,7 @@ function matchCondition(row, cond, db) {
 function advancedFilterModal() {
   const view = currentView();
   const fg = view.filterGroup || (view.filterGroup = { op: "and", conditions: [] });
-  const filterable = state.db.properties.filter((p) => p.type !== "formula" && p.type !== "rollup" && p.type !== "relation");
+  const filterable = state.db.properties.filter((p) => !COMPUTED_PROPS.has(p.type) && p.type !== "relation");
 
   const list = h("div", { class: "filter-conditions" });
   const paint = () => {
@@ -365,6 +372,7 @@ function visibleRows() {
     const p = db.properties.find((x) => x.id === sort.propId);
     if (p) {
       const val = (r) => {
+        if (AUTO_PROPS.has(p.type)) return autoValue(r, p);
         let v = r.values[p.id];
         if (p.type === "select") return p.options?.findIndex((o) => o.id === v) ?? -1;
         if (p.type === "number") return Number(v ?? -Infinity);
@@ -397,6 +405,7 @@ function renderView() {
 
 /* rótulo curto de uma propriedade para cards (chip/data/texto) */
 function propBadge(row, p) {
+  if (AUTO_PROPS.has(p.type)) return h("span", { class: "chip" }, (p.type === "created" ? "🕐 " : "✎ ") + fmtDate(autoValue(row, p), { day: "numeric", month: "short" }));
   const v = row.values[p.id];
   if (v == null || v === "" || (Array.isArray(v) && !v.length)) return null;
   if (p.type === "select") {
@@ -524,8 +533,39 @@ function emptyView(root, icon, msg) {
   root.appendChild(h("div", { class: "empty-state" }, h("div", { class: "es-icon" }, icon), h("div", { class: "es-desc" }, msg)));
 }
 function newRowBtn() {
-  return h("button", { class: "db-newrow", style: "border:1px solid var(--border);border-radius:var(--r-md);margin-top:10px", onclick: () => addRow() },
+  return h("button", { class: "db-newrow", style: "border:1px solid var(--border);border-radius:var(--r-md);margin-top:10px", onclick: (e) => newRowClick(e) },
     h("span", {}, "＋"), h("span", {}, "Novo registro"));
+}
+
+/* "Novo": direto quando não há templates; senão, menu Em branco / templates */
+function newRowClick(e) {
+  const tpls = state.db.templates || [];
+  if (!tpls.length) { addRow(); return; }
+  showMenu(e.currentTarget, [
+    { icon: "○", title: "Em branco", action: () => addRow() },
+    { label: "A partir de template" },
+    ...tpls.map((t) => ({ icon: "▤", title: t.name, action: () => addRow(structuredClone(t.values)) })),
+    { sep: true },
+    { icon: "⚙", title: "Gerenciar templates…", action: () => manageTemplates() },
+  ]);
+}
+
+function manageTemplates() {
+  const db = state.db;
+  const list = h("div", { style: "display:flex;flex-direction:column;gap:8px" });
+  const paint = () => {
+    list.innerHTML = "";
+    if (!db.templates?.length) list.appendChild(h("div", { style: "color:var(--text-faint);font-size:var(--fs-sm)" }, "Nenhum template. Salve uma linha como template pelo menu ⋯ da linha."));
+    (db.templates || []).forEach((t) => list.appendChild(h("div", { class: "auto-card" },
+      h("span", { style: "flex:none" }, "▤"),
+      h("div", { class: "auto-body" }, h("div", { class: "auto-name" }, t.name)),
+      h("button", { class: "icon-btn", title: "Excluir template", onclick: () => {
+        db.templates = db.templates.filter((x) => x.id !== t.id);
+        commit(); paint();
+      } }, "🗑"))));
+  };
+  paint();
+  showModal({ title: "Templates da database", body: list, width: 480 });
 }
 async function editTitle(row) {
   const name = await promptDialog({ title: "Editar registro", value: row.values.title || "" });
@@ -640,7 +680,7 @@ function renderTable(root) {
 
   root.appendChild(h("div", { class: "db-table-wrap" },
     h("table", { class: "db-table" }, h("thead", {}, thead), tbody),
-    h("button", { class: "db-newrow", onclick: () => addRow() }, h("span", {}, "＋"), h("span", {}, "Nova linha"))
+    h("button", { class: "db-newrow", onclick: (e) => newRowClick(e) }, h("span", {}, "＋"), h("span", {}, "Nova linha"))
   ));
 
   if (!rows.length) {
@@ -759,6 +799,13 @@ function rowMenu(e, row) {
       copy.parentId = row.parentId;
       state.db.rows.splice(state.db.rows.indexOf(row) + 1, 0, copy);
       commit(); renderView();
+    } },
+    { icon: "▤", title: "Salvar como template", action: async () => {
+      const name = await promptDialog({ title: "Nome do template", value: row.values.title || "Template" });
+      if (name == null) return;
+      state.db.templates = state.db.templates || [];
+      state.db.templates.push({ id: uid("tp"), name: name || "Template", values: structuredClone(row.values) });
+      commit(); toast("Template salvo — use no botão “Nova linha”");
     } },
     { icon: "🗑", title: "Excluir linha" + (descendantsOf(row.id).length ? " e sub-itens" : ""), danger: true, action: () => {
       const kill = new Set([row.id, ...descendantsOf(row.id)]);
@@ -1025,6 +1072,13 @@ function renderCell(row, prop, isFirst) {
       const cell = h("div", { class: cls + " cell-formula", title: "Rollup (somente leitura)" });
       const val = evalRollup(prop, row, state.db);
       cell.appendChild(val === "" ? h("span", { class: "cell-empty" }, "—") : h("span", {}, val));
+      return cell;
+    }
+    case "created":
+    case "updated": {
+      const ts = autoValue(row, prop);
+      const cell = h("div", { class: cls + " cell-formula", title: prop.type === "created" ? "Data de criação (automática)" : "Última edição (automática)" });
+      cell.appendChild(h("span", {}, fmtDate(ts, { day: "2-digit", month: "2-digit", year: "2-digit", hour: "2-digit", minute: "2-digit" })));
       return cell;
     }
     default:
@@ -1570,7 +1624,7 @@ function runAutomations(row, change) {
       if (act.type === "notify") { notes.push(act.message || `Automação: ${a.name || "sem nome"}`); continue; }
       if (act.type === "setProp" && act.propId) {
         const tp = db.properties.find((p) => p.id === act.propId);
-        if (!tp || ["formula", "rollup"].includes(tp.type)) continue;
+        if (!tp || COMPUTED_PROPS.has(tp.type)) continue;
         let val = act.value;
         if (val === "@today") val = todayKey();
         else if (val === "@tomorrow") val = todayKey(new Date(Date.now() + DAY_MS));
@@ -1671,7 +1725,7 @@ function autoValueControl(prop, current, { includeAny = false } = {}) {
 
 function automationEditor(existing) {
   const db = state.db;
-  const editable = db.properties.filter((p) => !["formula", "rollup", "relation"].includes(p.type));
+  const editable = db.properties.filter((p) => !COMPUTED_PROPS.has(p.type) && p.type !== "relation");
   const draft = existing
     ? JSON.parse(JSON.stringify(existing))
     : { id: uid("au"), name: "", enabled: true, trigger: { type: "propChanged", propId: editable.find((p) => p.type === "select")?.id || editable[0]?.id, toValue: "" }, actions: [] };
