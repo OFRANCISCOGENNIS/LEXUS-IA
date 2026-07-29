@@ -1,6 +1,6 @@
 // ═══════════════ NEXUS · Home (visão geral do workspace) ═══════════════
 
-import { listPages, listDatabases, workspaceStats, getOrCreateDaily } from "../core/store.js";
+import { listPages, listDatabases, workspaceStats, getOrCreateDaily, getPage } from "../core/store.js";
 import { estimateStorage } from "../core/db.js";
 import { navigate } from "../core/router.js";
 import { h, fmtRelative, stripHtml } from "../core/utils.js";
@@ -41,6 +41,7 @@ export default {
       recents.forEach((p, i) => {
         const isPriv = p.private && !isUnlocked();
         const preview = isPriv ? "🔒 Página privada" : stripHtml((p.blocks || []).map((b) => b.content).join(" ")).slice(0, 90);
+        const parent = p.parentId ? getPage(p.parentId) : null;
         grid.appendChild(h("button", {
           class: "card hoverable home-page-card", style: `animation-delay:${i * 35}ms`,
           onclick: () => navigate("page", p.id),
@@ -48,7 +49,9 @@ export default {
           h("div", { class: "hp-head" }, h("span", { class: "hp-icon" }, p.icon || "▢"),
             h("span", { class: "hp-title" }, p.title || "Sem título")),
           h("div", { class: "hp-preview" }, preview || "Documento em branco"),
-          h("div", { class: "hp-meta" }, "editado " + fmtRelative(p.updatedAt))));
+          h("div", { class: "hp-meta" },
+            parent ? `↳ em ${parent.icon ? parent.icon + " " : ""}${parent.title || "Sem título"} · ` : "",
+            "editado " + fmtRelative(p.updatedAt))));
       });
       wrap.appendChild(grid);
     }

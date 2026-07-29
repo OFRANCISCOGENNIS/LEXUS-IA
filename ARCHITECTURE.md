@@ -52,10 +52,18 @@ export default {
 
 Páginas: `listPages({includeArchived})`, `getPage(id)`, `createPage(partial)`,
 `updatePage(id, patch)`, `touchPageBlocks(id)` (persistir blocos mutados in-place),
-`deletePage(id)` (→ lixeira), `duplicatePage(id)`, `getOrCreateDaily(dateKey?)`,
+`deletePage(id)` (→ lixeira, em cascata: move a página e todas as sub-páginas),
+`pageDescendants(id)` (ids de todas as sub-páginas em qualquer profundidade),
+`duplicatePage(id)`, `getOrCreateDaily(dateKey?)`,
 `makeBlock(type, contentHtml, props)`, `makePage(partial)`.
 
 Página: `{id, title, icon, cover, type:"page"|"daily", journalDate, parentId, blocks[], tags[], favorite, archived, locked, createdAt, updatedAt}` — campos extras livres (ex.: `mood`).
+`parentId` aninha páginas dentro de páginas (árvore exibida na sidebar com caret de
+expandir/recolher; estado persistido em `sidebarExpanded`, marcado como ephemeral no
+sync). Uma página cujo `parentId` não resolve (pai excluído, é daily note, etc.) cai
+como raiz automaticamente — nunca "desaparece" da sidebar. Criar sub-página: botão
+＋ no hover do item na sidebar, menu "⋯" da página (sidebar e topbar do editor), ou
+comando contextual no command palette.
 Bloco: `{id, type, content(html), props{}, children[]}` — tipos: p h1-h4 bulleted numbered todo toggle quote callout code divider image.
 
 Databases: `listDatabases()`, `getDatabase(id)`, `createDatabase(partial)`, `updateDatabase(id, patch)`,

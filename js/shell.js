@@ -5,9 +5,10 @@ import { navigate, parseHash } from "./core/router.js";
 import {
   listPages, listDatabases, createPage, createDatabase, getPage, getDatabase,
   getSetting, setSetting, deletePage, duplicatePage, updatePage, updateDatabase,
+  pageDescendants,
 } from "./core/store.js";
-import { h, isMac } from "./core/utils.js";
-import { showMenu, toast, emojiPicker, promptDialog } from "./core/ui.js";
+import { h, isMac, debounce } from "./core/utils.js";
+import { showMenu, toast, emojiPicker, promptDialog, confirmDialog } from "./core/ui.js";
 
 /* ── Tema / aparência ── */
 export function applyAppearance() {
@@ -34,25 +35,59 @@ export function toggleTheme() {
   setTheme(cur === "dark" ? "light" : "dark");
 }
 
-/* ── Sidebar ── */
-function pageItem(p, active) {
+/* ── Sidebar: árvore de páginas (páginas dentro de páginas) ── */
+let expandedPages = null; // Set<pageId> — lazy, persistido (sem disparar sync)
+function ensureExpandedLoaded() {
+  if (!expandedPages) expandedPages = new Set(getSetting("sidebarExpanded", []) || []);
+}
+const persistExpanded = debounce(() => setSetting("sidebarExpanded", [...expandedPages]), 400);
+function setExpanded(id, open) {
+  ensureExpandedLoaded();
+  open ? expandedPages.add(id) : expandedPages.delete(id);
+  persistExpanded();
+}
+
+/* cria uma sub-página dentro de `parentId` e navega para ela */
+function newSubpage(parentId) {
+  ensureExpandedLoaded();
+  expandedPages.add(parentId);
+  const p = createPage({ parentId });
+  navigate("page", p.id);
+  return p;
+}
+
+function pageItem(p, active, { depth = 0, hasChildren = false, expanded = false, flat = false } = {}) {
+  const caret = hasChildren
+    ? h("span", {
+        class: "si-caret" + (expanded ? " open" : ""),
+        onclick: (e) => { e.stopPropagation(); e.preventDefault(); setExpanded(p.id, !expanded); renderSidebar(); },
+      }, "▸")
+    : h("span", { class: "si-caret empty" });
+
   const el = h("button", {
-    class: "sidebar-item" + (active ? " active" : ""),
+    class: "sidebar-item page-tree-item" + (active ? " active" : ""),
+    style: flat ? "" : `padding-left: calc(var(--sp-2) + ${depth * 16}px)`,
     onclick: () => navigate("page", p.id),
   },
+    flat ? null : caret,
     h("span", { class: "si-icon" }, p.icon || "▢"),
     h("span", { class: "si-label" }, p.title || "Sem título"),
     h("span", { class: "si-actions" },
+      h("button", {
+        class: "icon-btn", style: "width:22px;height:22px", "aria-label": "Nova sub-página", title: "Nova sub-página",
+        onclick: (e) => { e.stopPropagation(); newSubpage(p.id); },
+      }, "＋"),
       h("button", {
         class: "icon-btn", style: "width:22px;height:22px", "aria-label": "Mais opções",
         onclick: (e) => {
           e.stopPropagation();
           showMenu(e.currentTarget, [
             { icon: "☺", title: "Ícone", action: () => emojiPicker(el, (emoji) => updatePage(p.id, { icon: emoji })) },
+            { icon: "＋", title: "Nova sub-página", action: () => newSubpage(p.id) },
             { icon: p.favorite ? "★" : "☆", title: p.favorite ? "Remover dos favoritos" : "Favoritar", action: () => updatePage(p.id, { favorite: !p.favorite }) },
             { icon: "⧉", title: "Duplicar", action: () => { const c = duplicatePage(p.id); navigate("page", c.id); } },
             { sep: true },
-            { icon: "🗑", title: "Mover para lixeira", danger: true, action: async () => { await deletePage(p.id); toast("Página movida para a lixeira"); const first = listPages()[0]; navigate(first ? "page" : "home", first?.id); } },
+            { icon: "🗑", title: "Mover para lixeira", danger: true, action: () => deletePageWithConfirm(p) },
           ]);
         },
       }, "⋯")
@@ -61,7 +96,28 @@ function pageItem(p, active) {
   return el;
 }
 
+/* pede confirmação quando há sub-páginas, pois elas vão junto para a lixeira */
+async function deletePageWithConfirm(p) {
+  const kids = pageDescendants(p.id);
+  if (kids.length) {
+    const ok = await confirmDialog({
+      title: "Mover para a lixeira?",
+      message: `“${p.title || "Sem título"}” tem ${kids.length} sub-página${kids.length > 1 ? "s" : ""} — elas também irão para a lixeira. Você pode restaurar tudo depois.`,
+      confirmText: "Mover", danger: true,
+    });
+    if (!ok) return;
+  }
+  await deletePage(p.id);
+  toast(kids.length ? `Página e ${kids.length} sub-página${kids.length > 1 ? "s" : ""} movidas para a lixeira` : "Página movida para a lixeira");
+  const active = parseHash();
+  if (active.name === "page" && (active.params.id === p.id || kids.includes(active.params.id))) {
+    const first = listPages()[0];
+    navigate(first ? "page" : "home", first?.id);
+  }
+}
+
 export function renderSidebar() {
+  ensureExpandedLoaded();
   const route = parseHash();
   const pagesTree = document.getElementById("pages-tree");
   const dbsList = document.getElementById("dbs-list");
@@ -73,20 +129,52 @@ export function renderSidebar() {
 
   favSection.hidden = favs.length === 0;
   favList.innerHTML = "";
-  favs.forEach((p) => favList.appendChild(pageItem(p, route.name === "page" && route.params.id === p.id)));
+  favs.forEach((p) => favList.appendChild(pageItem(p, route.name === "page" && route.params.id === p.id, { flat: true })));
 
-  // renderização em lotes: nenhuma página fica de fora, e listas enormes não
-  // travam o primeiro paint — um sentinela carrega +80 conforme a barra rola
+  // ── monta a árvore: pai → filhos. Página cujo parentId não existe mais
+  // nesta lista (ex.: pai é uma daily note, ou virou órfã) vira raiz, para
+  // nunca "desaparecer" da barra. ──
+  const byId = new Map(pages.map((p) => [p.id, p]));
+  const childrenOf = new Map();
+  pages.forEach((p) => {
+    const parent = p.parentId && byId.has(p.parentId) ? p.parentId : null;
+    if (!childrenOf.has(parent)) childrenOf.set(parent, []);
+    childrenOf.get(parent).push(p);
+  });
+  const roots = childrenOf.get(null) || [];
+
+  // expande automaticamente os ancestrais da página ativa, para ela nunca
+  // ficar escondida dentro de um ramo recolhido
+  if (route.name === "page") {
+    let cur = byId.get(route.params.id);
+    while (cur?.parentId && byId.has(cur.parentId)) {
+      expandedPages.add(cur.parentId);
+      cur = byId.get(cur.parentId);
+    }
+  }
+
+  // achata a árvore (respeitando o que está expandido) em ordem de exibição
+  const flat = [];
+  const pushTree = (p, depth) => {
+    flat.push({ p, depth, hasChildren: (childrenOf.get(p.id) || []).length > 0 });
+    if (expandedPages.has(p.id)) (childrenOf.get(p.id) || []).forEach((c) => pushTree(c, depth + 1));
+  };
+  roots.forEach((p) => pushTree(p, 0));
+
+  const isActive = (p) => route.name === "page" && route.params.id === p.id;
+
+  // renderização em lotes: listas enormes não travam o primeiro paint —
+  // um sentinela carrega +80 linhas visíveis conforme a barra rola
   pagesTree.innerHTML = "";
   const CHUNK = 80;
   let rendered = 0;
-  const isActive = (p) => route.name === "page" && route.params.id === p.id;
   const renderChunk = () => {
     const frag = document.createDocumentFragment();
-    pages.slice(rendered, rendered + CHUNK).forEach((p) => frag.appendChild(pageItem(p, isActive(p))));
-    rendered = Math.min(rendered + CHUNK, pages.length);
+    flat.slice(rendered, rendered + CHUNK).forEach(({ p, depth, hasChildren }) =>
+      frag.appendChild(pageItem(p, isActive(p), { depth, hasChildren, expanded: expandedPages.has(p.id) })));
+    rendered = Math.min(rendered + CHUNK, flat.length);
     pagesTree.appendChild(frag);
-    if (rendered < pages.length) {
+    if (rendered < flat.length) {
       const sentinel = h("div", { style: "height:1px", dataset: { sentinel: "1" } });
       pagesTree.appendChild(sentinel);
       const io = new IntersectionObserver((entries) => {
@@ -99,8 +187,8 @@ export function renderSidebar() {
   renderChunk();
   // página ativa além do primeiro lote → garante que ela exista no DOM
   if (route.name === "page") {
-    const idx = pages.findIndex((p) => p.id === route.params.id);
-    while (idx >= rendered && rendered < pages.length) { dropSentinel(); renderChunk(); }
+    const idx = flat.findIndex(({ p }) => p.id === route.params.id);
+    while (idx >= rendered && rendered < flat.length) { dropSentinel(); renderChunk(); }
   }
   if (!pages.length)
     pagesTree.appendChild(h("div", { style: "padding:4px 10px;font-size:var(--fs-xs);color:var(--text-faint)" }, "Nenhuma página ainda"));

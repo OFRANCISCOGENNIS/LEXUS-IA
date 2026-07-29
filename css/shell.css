@@ -85,6 +85,17 @@
 .sidebar-item:hover { background: var(--surface-hover); color: var(--text); }
 .sidebar-item:active { transform: scale(0.985); }
 .sidebar-item.active { background: var(--accent-soft); color: var(--accent-text); }
+/* caret de expandir/recolher sub-páginas na árvore da barra lateral */
+.si-caret {
+  flex-shrink: 0; width: 14px; height: 14px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 9px; color: var(--text-faint);
+  border-radius: 3px;
+  transition: transform var(--t-fast) var(--ease-out), color var(--t-fast), background var(--t-fast);
+}
+.si-caret:hover { color: var(--text-2); background: var(--surface-active); }
+.si-caret.open { transform: rotate(90deg); }
+.si-caret.empty { visibility: hidden; }
 .si-icon {
   width: 20px; text-align: center; flex-shrink: 0;
   font-size: 14px; opacity: 0.85; font-style: normal;

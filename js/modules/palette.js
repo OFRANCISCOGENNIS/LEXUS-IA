@@ -14,8 +14,17 @@ let paletteEl = null;
 
 /* Comandos estáticos */
 function commands() {
-  return [
+  const route = parseHash();
+  const list = [
     { icon: "＋", title: "Nova página", kind: "Ação", kbd: "", run: () => newPage() },
+  ];
+  if (route.name === "page" && route.params.id) {
+    list.push({ icon: "＋", title: "Nova sub-página (nesta página)", kind: "Ação", run: () => {
+      const c = createPage({ parentId: route.params.id });
+      navigate("page", c.id);
+    } });
+  }
+  list.push(
     { icon: "▦", title: "Nova database", kind: "Ação", run: () => newDatabase() },
     { icon: "☀", title: "Abrir nota de hoje", kind: "Ação", run: () => { getOrCreateDaily(); navigate("daily"); } },
     { icon: "✓", title: "Abrir Tarefas & Projetos", kind: "Navegar", run: () => navigate("tasks") },
@@ -32,7 +41,8 @@ function commands() {
     { icon: "☾", title: "Tema escuro", kind: "Tema", run: () => setTheme("dark") },
     { icon: "◑", title: "Tema automático (sistema)", kind: "Tema", run: () => setTheme("auto") },
     { icon: "⌨", title: "Atalhos de teclado", kind: "Ajuda", kbd: "?", run: () => showShortcuts() },
-  ];
+  );
+  return list;
 }
 
 export function initPalette() {

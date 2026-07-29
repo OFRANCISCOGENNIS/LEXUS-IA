@@ -197,7 +197,8 @@ function startAuto() {
   const schedulePush = () => { clearTimeout(pushTimer); pushTimer = setTimeout(() => pushNow().catch(() => {}), 4000); };
   bus.on("pages:changed", schedulePush);
   bus.on("dbs:changed", schedulePush);
-  bus.on("settings:changed", ({ key }) => { if (!key.startsWith("supabase") && key !== "recentPages") schedulePush(); });
+  const EPHEMERAL_KEYS = new Set(["recentPages", "sidebarExpanded"]);
+  bus.on("settings:changed", ({ key }) => { if (!key.startsWith("supabase") && !EPHEMERAL_KEYS.has(key)) schedulePush(); });
 }
 
 /* ── SQL de setup (mostrado nas Configurações) ── */

@@ -205,4 +205,5 @@
   .kanban-card .kc-menu { opacity: 1; } /* mover cartão no toque (arraste HTML5 não funciona) */
   .kanban-card { cursor: default; }
   .gc-cover .row-menu-btn, .db-list-item .row-menu-btn { opacity: 1; }
+  .si-actions { display: flex !important; } /* ＋ sub-página / ⋯ acessíveis sem hover */
 }

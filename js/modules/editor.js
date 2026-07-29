@@ -7,6 +7,7 @@ import {
   snapshotPage, listVersions, restoreVersion, backlinksTo, unlinkedMentions,
   pageWordCount, deletePage, duplicatePage, getSetting, setSetting,
   listDatabases, getDatabase, createDatabase, makeRow, touchDatabase,
+  pageDescendants,
 } from "../core/store.js";
 import { bus } from "../core/bus.js";
 import { navigate } from "../core/router.js";
@@ -2095,6 +2096,7 @@ function setupTopbar(page) {
   moreBtn.onclick = (e) => showMenu(e.currentTarget, [
     { icon: "★", title: page.favorite ? "Remover dos favoritos" : "Adicionar aos favoritos",
       action: () => updatePage(page.id, { favorite: !page.favorite }) },
+    { icon: "＋", title: "Nova sub-página", action: () => { const c = createPage({ parentId: page.id }); navigate("page", c.id); } },
     { icon: "⧉", title: "Duplicar página", action: () => { const c = duplicatePage(page.id); navigate("page", c.id); } },
     { icon: page.locked ? "🔓" : "🔒", title: page.locked ? "Desbloquear página" : "Bloquear página (somente leitura)",
       action: () => { updatePage(page.id, { locked: !page.locked }); navigate("page", page.id); } },
@@ -2112,8 +2114,16 @@ function setupTopbar(page) {
     } },
     { sep: true },
     { icon: "🗑", title: "Mover para a lixeira", danger: true, action: async () => {
-      const ok = await confirmDialog({ title: "Mover para a lixeira?", message: "Você pode restaurar depois na Lixeira.", confirmText: "Mover", danger: true });
-      if (ok) { await deletePage(page.id); toast("Página movida para a lixeira"); navigate("home"); }
+      const kids = pageDescendants(page.id);
+      const message = kids.length
+        ? `Esta página tem ${kids.length} sub-página${kids.length > 1 ? "s" : ""} — elas também irão para a lixeira. Você pode restaurar tudo depois.`
+        : "Você pode restaurar depois na Lixeira.";
+      const ok = await confirmDialog({ title: "Mover para a lixeira?", message, confirmText: "Mover", danger: true });
+      if (ok) {
+        await deletePage(page.id);
+        toast(kids.length ? `Página e ${kids.length} sub-página${kids.length > 1 ? "s" : ""} movidas para a lixeira` : "Página movida para a lixeira");
+        navigate("home");
+      }
     } },
   ], { align: "right" });
 

@@ -171,14 +171,35 @@ export function touchPageBlocks(id) {
   bus.emit("pages:changed", { type: "blocks", id });
 }
 
+/* ids de todas as sub-páginas (em qualquer profundidade) */
+export function pageDescendants(id) {
+  const out = [];
+  const stack = [id];
+  while (stack.length) {
+    const cur = stack.pop();
+    for (const p of pages.values()) {
+      if (p.parentId === cur) { out.push(p.id); stack.push(p.id); }
+    }
+  }
+  return out;
+}
+
+/* Move a página e todas as sub-páginas para a lixeira (cada uma vira um
+   item restaurável independente — restaurar o pai não exige restaurar
+   os filhos, e vice-versa). */
 export async function deletePage(id) {
   const p = pages.get(id);
   if (!p) return;
-  pages.delete(id);
+  const ids = [id, ...pageDescendants(id)];
   persistPage.cancel();
-  await idb.del("pages", id);
-  await idb.put("trash", { id: uid("t"), kind: "page", data: p, deletedAt: Date.now() });
-  bus.emit("pages:changed", { type: "delete", id });
+  for (const pid of ids) {
+    const page = pages.get(pid);
+    if (!page) continue;
+    pages.delete(pid);
+    await idb.del("pages", pid);
+    await idb.put("trash", { id: uid("t"), kind: "page", data: page, deletedAt: Date.now() });
+  }
+  bus.emit("pages:changed", { type: "delete", id, ids });
 }
 
 export function duplicatePage(id) {
@@ -379,7 +400,7 @@ function ensureIndex() {
 
 bus.on("pages:changed", (e) => {
   if (!indexReady) return;
-  if (e?.type === "delete") { unindexPage(e.id); return; }
+  if (e?.type === "delete") { (e.ids || [e.id]).forEach(unindexPage); return; }
   const p = e?.id ? pages.get(e.id) : null;
   if (p) indexPage(p);
   else indexReady = false; // import/lote → reconstrói na próxima busca
