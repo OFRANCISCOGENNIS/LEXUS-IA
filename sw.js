@@ -3,14 +3,15 @@
 // Nenhum dado do usuário é armazenado aqui (isso vive em IndexedDB);
 // só o "casco" estático do app fica em cache.
 
-const CACHE = "nexus-shell-v10";
+const CACHE = "nexus-shell-v11";
 const ASSETS = [
   "./",
   "./index.html",
   "./manifest.webmanifest",
   "./css/tokens.css", "./css/base.css", "./css/shell.css", "./css/components.css",
   "./css/editor.css", "./css/database.css", "./css/views.css",
-  "./css/productivity.css", "./css/polish.css", "./css/mobile.css", "./css/print.css",
+  "./css/productivity.css", "./css/polish.css", "./css/redesign.css", "./css/mobile.css", "./css/print.css",
+  "./css/fonts.css", "./fonts/manrope-latin.woff2", "./fonts/lora-latin.woff2", "./fonts/lora-italic-latin.woff2",
   "./js/app.js",
   "./js/shell.js",
   "./js/core/bus.js", "./js/core/db.js", "./js/core/store.js", "./js/core/router.js",

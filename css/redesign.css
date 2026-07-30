@@ -1,0 +1,156 @@
+/* ═══════════════════════════════════════════════════════════════
+   NEXUS · Redesign (Claude Designer) — Manrope + Lora
+   Carregado por último: componentes novos + overrides do visual.
+   ═══════════════════════════════════════════════════════════════ */
+
+body { font-size: 13.5px; }
+
+/* ── Sidebar: marca ── */
+.sidebar-head { padding: 14px 10px 12px 12px; gap: 8px; }
+.ws-logo-block {
+  width: 28px; height: 28px; flex: none;
+  border-radius: 8px; background: var(--accent); color: #fff;
+  display: grid; place-items: center;
+  font-weight: 800; font-size: 14px; letter-spacing: -0.5px;
+}
+.ws-switcher { gap: 10px; }
+.ws-switcher .ws-name { font-weight: 800; font-size: 15px; letter-spacing: -0.2px; }
+.ws-local-pill {
+  margin-left: auto; flex: none;
+  font-size: 10px; font-weight: 700; color: var(--text-3);
+  background: var(--surface-hover); border: 1px solid var(--border);
+  border-radius: 20px; padding: 2px 8px;
+}
+
+/* ── Sidebar: busca em formato de input ── */
+.sidebar-search {
+  display: flex; align-items: center; gap: 9px;
+  width: 100%; margin: 0 0 4px;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 9px; padding: 7px 10px;
+  color: var(--text-3); font-size: 12.5px; font-weight: 500;
+  box-shadow: var(--shadow-sm); text-align: left;
+  transition: border-color var(--t-fast), color var(--t-fast);
+}
+.sidebar-search:hover { border-color: var(--accent); color: var(--text-2); }
+.sidebar-search .ss-label { flex: 1; }
+.sidebar-search .ss-kbd {
+  font-size: 10.5px; font-weight: 600; font-family: inherit;
+  background: var(--surface-hover); border-radius: 5px; padding: 2px 6px;
+}
+
+/* ── Sidebar: itens de navegação ── */
+.sidebar-item { border-radius: 8px; font-weight: 600; color: var(--text-3); }
+.sidebar-item:hover { color: var(--text); }
+.sidebar-item.active { background: var(--surface-active); color: var(--text); font-weight: 700; }
+.si-icon svg { display: block; }
+.si-badge {
+  flex: none; margin-left: auto;
+  font-size: 10.5px; font-weight: 700;
+  background: var(--accent-soft); color: var(--accent-text);
+  border-radius: 10px; padding: 1px 7px;
+}
+.section-title { font-size: 10.5px; font-weight: 800; letter-spacing: 0.08em; color: var(--text-faint); }
+.local-badge {
+  background: none; border: none; padding: 10px 9px 2px;
+  font-size: 10.5px; color: var(--text-faint); line-height: 1.4; display: block;
+}
+
+/* ── Topbar: CTA de captura, tema e avatar ── */
+.topbar { border-bottom: 1px solid var(--border); }
+.breadcrumb .crumb { font-weight: 700; font-size: 13px; color: var(--text-3); }
+.topbar-global { display: flex; align-items: center; gap: 8px; margin-left: 8px; flex: none; }
+.capture-cta {
+  display: flex; align-items: center; gap: 7px;
+  background: var(--accent); color: #fff;
+  border-radius: 8px; padding: 7px 13px;
+  font-size: 12.5px; font-weight: 700; white-space: nowrap;
+  transition: filter var(--t-fast);
+}
+.capture-cta:hover { filter: brightness(1.08); }
+.capture-cta kbd { opacity: 0.7; font-weight: 600; font-size: 10.5px; font-family: inherit; background: none; border: none; padding: 0; }
+.theme-toggle {
+  width: 32px; height: 32px; flex: none;
+  display: grid; place-items: center;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 8px; color: var(--text-3); font-size: 14px;
+  transition: color var(--t-fast), border-color var(--t-fast);
+}
+.theme-toggle:hover { color: var(--text); border-color: var(--border-strong); }
+.topbar-avatar {
+  width: 32px; height: 32px; flex: none; border-radius: 50%;
+  background: var(--accent-soft); color: var(--accent-text);
+  display: grid; place-items: center;
+  font-weight: 800; font-size: 12px; user-select: none;
+}
+
+/* ── Títulos de tela: Manrope 800, tracking apertado (não serifa) ── */
+h1, h2, h3, .home-greeting, .page-title, .db-name {
+  font-family: var(--font-body);
+}
+.home-greeting, .page-title, .db-name,
+.view h1, .prod-title, .tasks-title {
+  font-weight: 800; letter-spacing: -0.6px;
+}
+.section-title, .th-type { font-family: inherit; }
+
+/* ── Cards: raio 12, sombra suave do design ── */
+.card { border-radius: 12px; box-shadow: var(--shadow-md); }
+.btn { border-radius: 8px; font-weight: 700; }
+.btn.primary:hover { filter: brightness(1.08); }
+.input, .textarea { border-radius: 9px; }
+.chip { border-radius: 10px; font-weight: 700; }
+
+/* pills de filtro (Tarefas etc.) */
+.segmented, .seg-btn { border-radius: 20px; }
+.seg-btn { font-weight: 700; }
+.seg-btn.on { background: var(--text); color: var(--bg); }
+
+/* ── Checkboxes: raio 6, acento ── */
+.todo-check { border-radius: 6px; }
+.todo-check.checked { background: var(--accent); border-color: var(--accent); }
+
+/* ── Calendário: células raio 10, hoje em destaque accent ──
+   (.cal-* = view de database · .calp-* = aba Calendário agregada) */
+.cal-grid { gap: 6px; background: transparent; border: none; overflow: visible; }
+.cal-cell, .calp-cell { border-radius: 10px; background: var(--surface); border: 1px solid var(--border); }
+.cal-cell.empty, .calp-cell.empty { background: transparent; border-color: transparent; }
+.cal-cell.today, .calp-cell.today { background: var(--accent-soft); border-color: var(--accent); }
+.cal-cell.today .cal-daynum, .calp-cell.today .calp-daynum { color: var(--accent-text); font-weight: 800; }
+.cal-dow, .calp-dow { background: transparent; font-weight: 800; letter-spacing: 0.06em; color: var(--text-faint); }
+.cal-event { color: var(--accent-text); background: transparent; font-weight: 700; }
+
+/* ── Nota diária: prosa em Lora ── */
+.daily-page .block-content {
+  font-family: var(--font-serif);
+  font-size: 16px; line-height: 1.75;
+}
+.daily-page .block[data-type="h1"] .block-content,
+.daily-page .block[data-type="h2"] .block-content,
+.daily-page .block[data-type="h3"] .block-content { font-family: var(--font-body); }
+
+/* ── Editor: título 800 ── */
+.page-title { letter-spacing: -0.7px; }
+.callout { border-radius: 10px; }
+
+/* ── Barras de produtividade: dia atual em accent sólido ── */
+.prod-bar, .hm-cell { border-radius: 7px 7px 3px 3px; }
+
+/* ── Stat labels em uppercase 800 (KPIs) ── */
+.kpi-label, .hp-meta, .stat-label {
+  font-size: 11px; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase;
+}
+.kpi-value { font-weight: 800; }
+
+/* ── Animação de entrada de tela: fade + rise (0.3s) ── */
+.view-enter { animation: rd-rise 0.3s ease both; }
+@keyframes rd-rise {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: none; }
+}
+
+/* mobile: o CTA de captura sai do header (FAB e drawer já cobrem) */
+@media (max-width: 720px) {
+  .capture-cta { display: none; }
+  .topbar-avatar { display: none; }
+}

@@ -216,7 +216,7 @@ export default {
 
 function render(container, page) {
   container.innerHTML = "";
-  const wrap = h("div", { class: "page-container" });
+  const wrap = h("div", { class: "page-container" + (page.type === "daily" ? " daily-page" : "") });
 
   // ── Capa (banner) ──
   if (page.cover) wrap.appendChild(renderCover(page));

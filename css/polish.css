@@ -26,13 +26,7 @@
   --accent-text: hsl(222 55% 76%);
 }
 
-/* Tema escuro mais profundo, grafite neutro */
-[data-theme="dark"] {
-  --bg: #141416;
-  --bg-deep: #0F0F11;
-  --surface: #1B1B1E;
-  --surface-2: #202024;
-}
+/* (o tema escuro agora vem inteiro dos tokens do redesign — carvão quente) */
 
 /* ── Sidebar sóbria ── */
 .sidebar { background: var(--bg-deep); }

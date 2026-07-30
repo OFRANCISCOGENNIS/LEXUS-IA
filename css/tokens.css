@@ -4,9 +4,9 @@
    ═══════════════════════════════════════════════════════════════ */
 
 :root {
-  /* ── Tipografia ── */
-  --font-sans: "Inter var", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
-  --font-serif: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+  /* ── Tipografia (redesign: Manrope para UI, Lora para prosa) ── */
+  --font-sans: "Manrope", "Inter var", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+  --font-serif: "Lora", "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
   --font-mono: ui-monospace, "SF Mono", "JetBrains Mono", "Cascadia Code", Menlo, Consolas, monospace;
   --font-body: var(--font-sans);
 
@@ -31,8 +31,8 @@
   --t-fast: 150ms; --t-med: 220ms; --t-panel: 280ms; --t-slow: 350ms;
 
   /* ── Densidade / layout ── */
-  --sidebar-w: 264px;
-  --topbar-h: 48px;
+  --sidebar-w: 248px;
+  --topbar-h: 52px;
   --page-w: 720px;
   --density-y: 1;
 
@@ -46,6 +46,9 @@
   --on-accent: #fff;
 }
 
+/* violeta do redesign (#6f6ae0 claro · #8c88ef escuro via --accent-l do tema) */
+[data-accent="violet"] { --accent-h: 243; --accent-s: 66%; --accent-l: 65%; --accent-text: hsl(243 60% 55%); }
+[data-theme="dark"][data-accent="violet"] { --accent-l: 73%; --accent-text: hsl(243 75% 78%); }
 [data-accent="iris"]   { --accent-h: 248; --accent-s: 72%; }
 [data-accent="blue"]   { --accent-h: 214; --accent-s: 84%; }
 [data-accent="teal"]   { --accent-h: 176; --accent-s: 62%; --accent-l: 44%; --accent-text: hsl(176 62% 32%); }
@@ -53,64 +56,64 @@
 [data-accent="amber"]  { --accent-h: 36;  --accent-s: 90%; --accent-l: 50%; --accent-text: hsl(30 85% 38%); }
 [data-accent="rose"]   { --accent-h: 346; --accent-s: 72%; --accent-l: 56%; --accent-text: hsl(346 65% 44%); }
 
-/* ── Tema claro: papel quente, tinta suave ── */
+/* ── Tema claro: branco quente do redesign (Claude Designer) ── */
 :root, [data-theme="light"] {
-  --bg: #F7F7F5;
-  --bg-deep: #F1F0EE;
-  --surface: #FFFFFF;
-  --surface-2: #FBFBFA;
-  --surface-hover: rgba(20, 20, 18, 0.045);
-  --surface-active: rgba(20, 20, 18, 0.08);
-  --glass: rgba(255, 255, 255, 0.82);
+  --bg: #F5F4F0;
+  --bg-deep: #EEECE7;
+  --surface: #FDFCFA;
+  --surface-2: #F6F5F1;
+  --surface-hover: rgba(29, 28, 25, 0.05);
+  --surface-active: rgba(29, 28, 25, 0.08);
+  --glass: rgba(253, 252, 250, 0.85);
   --glass-border: rgba(255, 255, 255, 0.5);
 
-  --text: #26251F;
-  --text-2: #57554D;
-  --text-3: #8C8A80;
-  --text-faint: #B5B3A9;
+  --text: #1D1C19;
+  --text-2: #5A574C;
+  --text-3: #8B8779;
+  --text-faint: #B4B0A4;
 
-  --border: rgba(25, 25, 20, 0.09);
-  --border-strong: rgba(25, 25, 20, 0.16);
+  --border: rgba(29, 28, 25, 0.09);
+  --border-strong: rgba(29, 28, 25, 0.17);
 
-  --shadow-sm: 0 1px 2px rgba(20, 20, 15, 0.05);
-  --shadow-md: 0 2px 6px rgba(20, 20, 15, 0.06), 0 8px 24px rgba(20, 20, 15, 0.07);
-  --shadow-lg: 0 4px 12px rgba(20, 20, 15, 0.08), 0 20px 48px rgba(20, 20, 15, 0.14);
-  --shadow-pop: 0 0 0 1px rgba(25,25,20,0.05), 0 10px 34px rgba(20,20,15,0.16);
+  --shadow-sm: 0 1px 2px rgba(29, 28, 25, 0.05);
+  --shadow-md: 0 1px 2px rgba(29, 28, 25, 0.05), 0 4px 16px rgba(29, 28, 25, 0.04);
+  --shadow-lg: 0 4px 12px rgba(29, 28, 25, 0.08), 0 20px 48px rgba(29, 28, 25, 0.14);
+  --shadow-pop: 0 0 0 1px rgba(29,28,25,0.05), 0 10px 34px rgba(29,28,25,0.16);
 
-  --code-bg: #F4F3F0;
-  --scrollbar: rgba(20,20,18,0.18);
+  --code-bg: #F1EFEA;
+  --scrollbar: rgba(29,28,25,0.18);
 
   --ok: #3E9B63; --warn: #C98A1B; --danger: #D5524A;
   --ok-soft: rgba(62,155,99,.12); --warn-soft: rgba(201,138,27,.12); --danger-soft: rgba(213,82,74,.1);
   color-scheme: light;
 }
 
-/* ── Tema escuro: grafite profundo, texto marfim ── */
+/* ── Tema escuro: carvão quente do redesign (Claude Designer) ── */
 [data-theme="dark"] {
-  --bg: #17171B;
-  --bg-deep: #121215;
-  --surface: #1E1E23;
-  --surface-2: #232329;
-  --surface-hover: rgba(235, 235, 245, 0.055);
-  --surface-active: rgba(235, 235, 245, 0.1);
-  --glass: rgba(30, 30, 36, 0.78);
+  --bg: #141311;
+  --bg-deep: #100F0D;
+  --surface: #1D1C19;
+  --surface-2: #232119;
+  --surface-hover: rgba(237, 235, 228, 0.05);
+  --surface-active: rgba(237, 235, 228, 0.1);
+  --glass: rgba(29, 28, 25, 0.8);
   --glass-border: rgba(255, 255, 255, 0.08);
 
-  --text: #EAE8E3;
-  --text-2: #ABA9A2;
-  --text-3: #75736D;
-  --text-faint: #55534E;
+  --text: #EDEBE4;
+  --text-2: #B3B0A6;
+  --text-3: #938F83;
+  --text-faint: #5C594F;
 
-  --border: rgba(235, 235, 245, 0.08);
-  --border-strong: rgba(235, 235, 245, 0.16);
+  --border: rgba(237, 235, 228, 0.08);
+  --border-strong: rgba(237, 235, 228, 0.17);
 
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
-  --shadow-md: 0 2px 6px rgba(0, 0, 0, 0.32), 0 8px 24px rgba(0, 0, 0, 0.36);
+  --shadow-md: 0 1px 2px rgba(0, 0, 0, 0.3), 0 4px 16px rgba(0, 0, 0, 0.25);
   --shadow-lg: 0 4px 12px rgba(0, 0, 0, 0.4), 0 20px 48px rgba(0, 0, 0, 0.5);
   --shadow-pop: 0 0 0 1px rgba(255,255,255,0.06), 0 10px 34px rgba(0,0,0,0.55);
 
-  --code-bg: #26262D;
-  --scrollbar: rgba(235,235,245,0.16);
+  --code-bg: #262420;
+  --scrollbar: rgba(237,235,228,0.16);
 
   --accent-l: 68%;
   --accent-text: hsl(var(--accent-h) 78% 74%);

@@ -12,9 +12,9 @@ import * as sync from "../core/sync.js";
 import { bus } from "../core/bus.js";
 
 const ACCENTS = [
-  ["slate", "hsl(215 28% 46%)"], ["navy", "hsl(222 45% 38%)"], ["iris", "hsl(248 72% 62%)"],
-  ["blue", "hsl(214 84% 56%)"], ["teal", "hsl(176 62% 44%)"], ["green", "hsl(148 55% 44%)"],
-  ["amber", "hsl(36 90% 50%)"], ["rose", "hsl(346 72% 56%)"],
+  ["violet", "hsl(243 66% 65%)"], ["slate", "hsl(215 28% 46%)"], ["navy", "hsl(222 45% 38%)"],
+  ["iris", "hsl(248 72% 62%)"], ["blue", "hsl(214 84% 56%)"], ["teal", "hsl(176 62% 44%)"],
+  ["green", "hsl(148 55% 44%)"], ["amber", "hsl(36 90% 50%)"], ["rose", "hsl(346 72% 56%)"],
 ];
 
 export default {

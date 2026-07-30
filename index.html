@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="pt-BR" data-theme="light" data-accent="slate">
+<html lang="pt-BR" data-theme="light" data-accent="violet">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -10,6 +10,8 @@
   <title>NEXUS — Workspace 100% local</title>
   <link rel="manifest" href="manifest.webmanifest" />
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%E2%97%86%3C/text%3E%3C/svg%3E" />
+  <!-- Tipografia do redesign: Manrope (UI) + Lora (prosa) — auto-hospedadas, 100% local -->
+  <link rel="stylesheet" href="css/fonts.css" />
   <link rel="stylesheet" href="css/tokens.css" />
   <link rel="stylesheet" href="css/base.css" />
   <link rel="stylesheet" href="css/shell.css" />
@@ -19,6 +21,7 @@
   <link rel="stylesheet" href="css/views.css" />
   <link rel="stylesheet" href="css/productivity.css" />
   <link rel="stylesheet" href="css/polish.css" />
+  <link rel="stylesheet" href="css/redesign.css" />
   <link rel="stylesheet" href="css/mobile.css" />
   <link rel="stylesheet" href="css/print.css" media="print" />
 </head>
@@ -28,9 +31,10 @@
     <aside id="sidebar" class="sidebar" aria-label="Navegação">
       <div class="sidebar-head">
         <button id="ws-switcher" class="ws-switcher" title="Workspace">
-          <span class="ws-logo">◆</span>
+          <span class="ws-logo-block">N</span>
           <span class="ws-name">NEXUS</span>
         </button>
+        <span class="ws-local-pill" title="100% local">local</span>
         <button id="sidebar-collapse" class="icon-btn" title="Recolher sidebar (⌘\)" aria-label="Recolher sidebar">
           <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M10 3L5 8l5 5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
         </button>
@@ -39,34 +43,32 @@
       <!-- corpo único: a roda do mouse rola a barra inteira, em qualquer ponto -->
       <div class="sidebar-body">
       <div class="sidebar-actions">
-        <button class="sidebar-item" data-action="open-palette">
-          <span class="si-icon">⌕</span><span class="si-label">Buscar</span>
-          <kbd class="si-kbd">⌘K</kbd>
-        </button>
-        <button class="sidebar-item" data-action="quick-capture">
-          <span class="si-icon">✦</span><span class="si-label">Captura rápida</span>
-          <kbd class="si-kbd">⌘⇧N</kbd>
+        <button class="sidebar-search" data-action="open-palette" aria-label="Buscar">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><line x1="20" y1="20" x2="16.5" y2="16.5"/></svg>
+          <span class="ss-label">Buscar…</span>
+          <kbd class="ss-kbd">⌘K</kbd>
         </button>
         <button class="sidebar-item" data-nav="home">
-          <span class="si-icon">⌂</span><span class="si-label">Início</span>
+          <span class="si-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V20h14V9.5"/></svg></span><span class="si-label">Início</span>
         </button>
         <button class="sidebar-item" data-nav="daily">
-          <span class="si-icon">☀</span><span class="si-label">Nota diária</span>
+          <span class="si-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4.5"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5 5l2 2M17 17l2 2M19 5l-2 2M7 17l-2 2"/></svg></span><span class="si-label">Nota diária</span>
         </button>
         <button class="sidebar-item" data-nav="tasks">
-          <span class="si-icon">✓</span><span class="si-label">Tarefas</span>
+          <span class="si-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="3.5" width="17" height="17" rx="4"/><path d="m8.5 12.2 2.4 2.4 4.8-5"/></svg></span><span class="si-label">Tarefas</span>
+          <span class="si-badge" id="nav-tasks-badge" hidden>0</span>
         </button>
         <button class="sidebar-item" data-nav="calendar">
-          <span class="si-icon">📅</span><span class="si-label">Calendário</span>
+          <span class="si-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3.5" y="5" width="17" height="16" rx="3"/><path d="M3.5 10h17M8 2.5V6M16 2.5V6"/></svg></span><span class="si-label">Calendário</span>
         </button>
         <button class="sidebar-item" data-nav="productivity">
-          <span class="si-icon">◷</span><span class="si-label">Produtividade</span>
+          <span class="si-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 20V10M10 20V4M16 20v-8M22 20H2"/></svg></span><span class="si-label">Produtividade</span>
         </button>
         <button class="sidebar-item" data-nav="tags">
-          <span class="si-icon">🏷</span><span class="si-label">Tags</span>
+          <span class="si-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11.5V4h7.5L21 14.5 13.5 22 3 11.5Z"/><circle cx="8" cy="9" r="1.4"/></svg></span><span class="si-label">Tags</span>
         </button>
         <button class="sidebar-item" data-nav="graph">
-          <span class="si-icon">◉</span><span class="si-label">Grafo</span>
+          <span class="si-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="6" cy="6" r="2.5"/><circle cx="18" cy="8" r="2.5"/><circle cx="12" cy="18" r="2.5"/><path d="M8.2 7 15.6 8M7 8.2l4 7.6M16.8 10l-3.6 6"/></svg></span><span class="si-label">Grafo</span>
         </button>
       </div>
 
@@ -101,16 +103,16 @@
 
       <div class="sidebar-foot">
         <button class="sidebar-item" data-nav="templates">
-          <span class="si-icon">▤</span><span class="si-label">Templates</span>
+          <span class="si-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3.5" y="3.5" width="17" height="17" rx="3"/><path d="M3.5 9h17M9.5 9v11.5"/></svg></span><span class="si-label">Templates</span>
         </button>
         <button class="sidebar-item" data-nav="trash">
-          <span class="si-icon">🗑</span><span class="si-label">Lixeira</span>
+          <span class="si-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M6 7l1 13h10l1-13M10 7V4h4v3M10 11v6M14 11v6"/></svg></span><span class="si-label">Lixeira</span>
         </button>
         <button class="sidebar-item" data-nav="settings">
-          <span class="si-icon">⚙</span><span class="si-label">Configurações</span>
+          <span class="si-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M19.1 4.9 17 7M7 17l-2.1 2.1"/></svg></span><span class="si-label">Configurações</span>
         </button>
-        <div class="local-badge" title="Toda a IA e todos os dados rodam apenas neste dispositivo">
-          <span class="badge-dot"></span> 100% local · seus dados nunca saem do dispositivo
+        <div class="local-badge" title="Todos os dados vivem apenas neste dispositivo">
+          🔒 100% local — seus dados nunca saem do dispositivo
         </div>
       </div>
       </div><!-- /.sidebar-body -->
@@ -129,6 +131,13 @@
           <nav id="breadcrumb" class="breadcrumb" aria-label="Caminho"></nav>
         </div>
         <div class="topbar-right" id="topbar-actions"></div>
+        <div class="topbar-global">
+          <button class="capture-cta" data-action="quick-capture" title="Captura rápida (⌘⇧N)">
+            ＋ Captura rápida <kbd>⌘⇧N</kbd>
+          </button>
+          <button id="theme-toggle" class="theme-toggle" title="Alternar tema (⌘⇧L)" aria-label="Alternar tema">🌙</button>
+          <span class="topbar-avatar" id="topbar-avatar" title="NEXUS · workspace local">N</span>
+        </div>
       </header>
       <main id="view" class="view" tabindex="-1"></main>
     </div>

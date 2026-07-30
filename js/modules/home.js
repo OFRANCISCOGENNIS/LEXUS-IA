@@ -14,9 +14,11 @@ export default {
 
     const wrap = h("div", { class: "page-container home" });
 
+    const hour = now.getHours();
+    const saud = hour < 12 ? "Bom dia" : hour < 18 ? "Boa tarde" : "Boa noite";
     wrap.appendChild(h("div", { class: "home-hero" },
-      h("h1", { class: "home-greeting" }, "Visão Geral do Workspace"),
-      h("p", { class: "home-date" }, dateStr[0].toUpperCase() + dateStr.slice(1))));
+      h("p", { class: "home-date" }, dateStr[0].toUpperCase() + dateStr.slice(1)),
+      h("h1", { class: "home-greeting" }, `${saud} 👋`)));
 
     // ações principais
     const actions = [

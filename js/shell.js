@@ -16,7 +16,7 @@ export function applyAppearance() {
   const theme = getSetting("theme", "auto");
   const dark = theme === "dark" || (theme === "auto" && matchMedia("(prefers-color-scheme: dark)").matches);
   html.dataset.theme = dark ? "dark" : "light";
-  html.dataset.accent = getSetting("accent", "slate");
+  html.dataset.accent = getSetting("accent", "violet");
   html.dataset.density = getSetting("density", "comfortable");
   html.dataset.font = getSetting("font", "sans");
   html.dataset.pagewidth = getSetting("pagewidth", "normal");
@@ -208,6 +208,22 @@ export function renderSidebar() {
   document.querySelectorAll(".sidebar [data-nav], .mobile-tabbar [data-nav]").forEach((el) => {
     el.classList.toggle("active", el.dataset.nav === route.name);
   });
+
+  // badge de tarefas pendentes (redesign): checklists não concluídos das páginas
+  const badge = document.getElementById("nav-tasks-badge");
+  if (badge) {
+    let pend = 0, scanned = 0;
+    const walk = (bs) => {
+      for (const b of bs) {
+        if (++scanned > 4000) return; // teto de varredura — o badge é informativo
+        if (b.type === "todo" && !b.props?.checked) pend++;
+        if (b.children?.length) walk(b.children);
+      }
+    };
+    for (const p of listPages()) { walk(p.blocks || []); if (scanned > 4000) break; }
+    badge.hidden = pend === 0;
+    badge.textContent = pend > 99 ? "99+" : String(pend);
+  }
   // FAB só faz sentido em telas de navegação, não dentro do editor/db
   const fab = document.getElementById("mobile-fab");
   if (fab) fab.hidden = ["page", "db"].includes(route.name);
@@ -332,12 +348,20 @@ export function initShell() {
     });
   });
 
+  // alternância de tema no header (redesign): 🌙 no claro, ☀️ no escuro
+  const themeBtn = document.getElementById("theme-toggle");
+  const paintThemeBtn = () => {
+    if (themeBtn) themeBtn.textContent = document.documentElement.dataset.theme === "dark" ? "☀️" : "🌙";
+  };
+  themeBtn?.addEventListener("click", () => toggleTheme());
+  paintThemeBtn();
+
   // re-render reativo
   bus.on("pages:changed", () => { renderSidebar(); renderBreadcrumb(); });
   bus.on("dbs:changed", () => { renderSidebar(); renderBreadcrumb(); });
   bus.on("route:changed", () => { renderSidebar(); renderBreadcrumb(); });
   bus.on("settings:changed", ({ key }) => {
-    if (["theme", "accent", "density", "font", "pagewidth"].includes(key)) applyAppearance();
+    if (["theme", "accent", "density", "font", "pagewidth"].includes(key)) { applyAppearance(); paintThemeBtn(); }
   });
 
   // atalhos globais (estilo Windows)
