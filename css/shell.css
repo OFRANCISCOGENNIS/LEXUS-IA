@@ -124,7 +124,17 @@
   border: 1px solid var(--accent-soft);
   border-radius: var(--r-md);
   display: flex; align-items: center; gap: 7px;
+  width: 100%; text-align: left;
+  transition: background var(--t-fast), border-color var(--t-fast);
 }
+button.local-badge { cursor: pointer; }
+button.local-badge:hover { background: var(--accent-soft); border-color: var(--accent); }
+.local-badge .lb-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; background: var(--text-faint); }
+.local-badge.sb-ready .lb-dot { background: var(--ok); box-shadow: 0 0 0 3px var(--ok-soft); }
+.local-badge.sb-syncing .lb-dot { background: var(--accent); animation: nx-pulse 1s infinite; }
+.local-badge.sb-error .lb-dot { background: var(--danger); }
+.local-badge.sb-locked .lb-dot, .local-badge.sb-off .lb-dot { background: var(--warn); }
+.local-badge.sb-error { border-color: var(--danger-soft); background: var(--danger-soft); color: var(--danger); }
 .badge-dot {
   width: 7px; height: 7px; border-radius: 50%;
   background: var(--ok); flex-shrink: 0;

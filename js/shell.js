@@ -9,6 +9,7 @@ import {
 } from "./core/store.js";
 import { h, isMac, debounce } from "./core/utils.js";
 import { showMenu, toast, emojiPicker, promptDialog, confirmDialog } from "./core/ui.js";
+import * as sync from "./core/sync.js";
 
 /* ── Tema / aparência ── */
 export function applyAppearance() {
@@ -345,6 +346,7 @@ export function initShell() {
       else if (a === "new-database") newDatabase();
       else if (a === "open-palette") bus.emit("palette:open", {});
       else if (a === "quick-capture") bus.emit("capture:open", {});
+      else if (a === "open-sync-settings") { setDrawer(false); navigate("settings"); }
     });
   });
 
@@ -355,6 +357,39 @@ export function initShell() {
   };
   themeBtn?.addEventListener("click", () => toggleTheme());
   paintThemeBtn();
+
+  // ── Sincronização: o selo "100% local" da barra lateral reflete o status
+  // real e leva às Configurações — sync continua opcional, mas descobrível. ──
+  const syncBadge = document.getElementById("sidebar-sync-badge");
+  const paintSyncBadge = () => {
+    if (!syncBadge) return;
+    const st = sync.syncState();
+    syncBadge.classList.remove("sb-off", "sb-ready", "sb-syncing", "sb-error", "sb-locked");
+    let text;
+    if (!st.configured) {
+      text = "🔒 100% local — sincronizar entre dispositivos →";
+      syncBadge.classList.add("sb-off");
+    } else if (st.status === "off") {
+      text = "🔒 100% local — entrar / criar conta →";
+      syncBadge.classList.add("sb-off");
+    } else if (st.status === "locked") {
+      text = "🔐 Sincronização bloqueada — toque para desbloquear";
+      syncBadge.classList.add("sb-locked");
+    } else if (st.status === "syncing") {
+      text = "☁ Sincronizando…";
+      syncBadge.classList.add("sb-syncing");
+    } else if (st.status === "error") {
+      text = "⚠ Erro de sincronização — toque para ver";
+      syncBadge.classList.add("sb-error");
+    } else {
+      text = `☁ Sincronizado${st.user?.email ? " · " + st.user.email : ""}`;
+      syncBadge.classList.add("sb-ready");
+    }
+    syncBadge.innerHTML = "";
+    syncBadge.append(h("span", { class: "lb-dot" }), h("span", {}, text));
+  };
+  bus.on("sync:status", paintSyncBadge);
+  paintSyncBadge();
 
   // re-render reativo
   bus.on("pages:changed", () => { renderSidebar(); renderBreadcrumb(); });

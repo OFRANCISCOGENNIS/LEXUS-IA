@@ -51,10 +51,9 @@ body { font-size: 13.5px; }
   border-radius: 10px; padding: 1px 7px;
 }
 .section-title { font-size: 10.5px; font-weight: 800; letter-spacing: 0.08em; color: var(--text-faint); }
-.local-badge {
-  background: none; border: none; padding: 10px 9px 2px;
-  font-size: 10.5px; color: var(--text-faint); line-height: 1.4; display: block;
-}
+/* selo "100% local" — agora também indica/abre a sincronização (ver shell.css
+   para o estado por cor via .sb-off/.sb-ready/.sb-syncing/.sb-error/.sb-locked) */
+.local-badge { font-size: 10.5px; line-height: 1.4; }
 
 /* ── Topbar: CTA de captura, tema e avatar ── */
 .topbar { border-bottom: 1px solid var(--border); }

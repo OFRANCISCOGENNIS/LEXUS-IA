@@ -108,6 +108,8 @@ export async function signOut() {
   try { const c = await getClient(); await c.auth.signOut(); } catch {}
   user = null; encKey = null;
   clearInterval(pullTimer); clearTimeout(pushTimer);
+  autoOffs.forEach((off) => off()); autoOffs = [];
+  lastPushHash = null; lastPulledAt = null;
   setStatus("off");
 }
 
@@ -189,16 +191,22 @@ async function firstSync() {
   await pushNow();
 }
 
+let autoOffs = [];
 function startAuto() {
+  // idempotente: sign-out→sign-in repetido não deve empilhar listeners/timers
+  autoOffs.forEach((off) => off());
+  autoOffs = [];
   clearInterval(pullTimer);
   pullTimer = setInterval(() => pullNow(), 45000);
-  document.addEventListener("visibilitychange", () => { if (!document.hidden) pullNow(); });
+  const onVisible = () => { if (!document.hidden) pullNow(); };
+  document.addEventListener("visibilitychange", onVisible);
+  autoOffs.push(() => document.removeEventListener("visibilitychange", onVisible));
   // empurra mudanças locais (debounced)
   const schedulePush = () => { clearTimeout(pushTimer); pushTimer = setTimeout(() => pushNow().catch(() => {}), 4000); };
-  bus.on("pages:changed", schedulePush);
-  bus.on("dbs:changed", schedulePush);
+  autoOffs.push(bus.on("pages:changed", schedulePush));
+  autoOffs.push(bus.on("dbs:changed", schedulePush));
   const EPHEMERAL_KEYS = new Set(["recentPages", "sidebarExpanded"]);
-  bus.on("settings:changed", ({ key }) => { if (!key.startsWith("supabase") && !EPHEMERAL_KEYS.has(key)) schedulePush(); });
+  autoOffs.push(bus.on("settings:changed", ({ key }) => { if (!key.startsWith("supabase") && !EPHEMERAL_KEYS.has(key)) schedulePush(); }));
 }
 
 /* ── SQL de setup (mostrado nas Configurações) ── */

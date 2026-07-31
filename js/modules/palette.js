@@ -31,6 +31,7 @@ function commands() {
     { icon: "📅", title: "Abrir Calendário", kind: "Navegar", run: () => navigate("calendar") },
     { icon: "◷", title: "Abrir Produtividade (Pomodoro, Hábitos, Lembretes)", kind: "Navegar", run: () => navigate("productivity") },
     { icon: "🏷", title: "Abrir Tags & Coleções", kind: "Navegar", run: () => navigate("tags") },
+    { icon: "☁", title: "Sincronizar entre dispositivos", kind: "Ação", run: () => navigate("settings") },
     { icon: "🍅", title: "Iniciar Pomodoro", kind: "Ação", run: () => navigate("productivity") },
     { icon: "◉", title: "Ver grafo de conhecimento", kind: "Navegar", run: () => navigate("graph") },
     { icon: "▤", title: "Galeria de templates", kind: "Navegar", run: () => navigate("templates") },

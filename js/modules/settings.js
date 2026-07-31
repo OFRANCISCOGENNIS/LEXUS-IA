@@ -184,16 +184,28 @@ function buildSyncBody() {
     const key = h("input", { class: "input", placeholder: "chave anon public", value: getSetting("supabaseKey", "") });
     const save = h("button", { class: "btn primary", onclick: () => {
       if (!url.value.trim() || !key.value.trim()) { toast("Preencha URL e chave", { type: "warn" }); return; }
-      sync.saveConfig(url.value, key.value); toast("Configuração salva"); bus.emit("sync:status", sync.syncState());
-    } }, "Salvar configuração");
+      if (!/^https:\/\/[a-z0-9-]+\.supabase\.co$/i.test(url.value.trim())) {
+        toast("A URL deve ter o formato https://xxxx.supabase.co", { type: "warn" }); return;
+      }
+      sync.saveConfig(url.value, key.value); toast("Configuração salva — agora crie sua conta abaixo ↓");
+      bus.emit("sync:status", sync.syncState());
+    } }, "Salvar e continuar");
+    const copySql = h("button", { class: "btn ghost sm", onclick: async () => {
+      try { await navigator.clipboard.writeText(sync.SETUP_SQL); toast("SQL copiado ✓"); }
+      catch { toast("Não foi possível copiar — selecione o texto manualmente", { type: "warn" }); }
+    } }, "⧉ Copiar SQL");
     box.append(
-      h("details", { class: "sync-setup" },
-        h("summary", {}, "Como configurar (grátis, 3 passos)"),
+      h("details", { class: "sync-setup", open: true },
+        h("summary", {}, "Como ativar (grátis, leva ~5 minutos)"),
         h("ol", { class: "sync-steps" },
-          h("li", {}, "Crie um projeto grátis em supabase.com"),
-          h("li", {}, "Em SQL Editor, rode o SQL abaixo (cria a tabela cifrada + segurança por usuário):"),
-          h("pre", { class: "sync-sql" }, sync.SETUP_SQL),
-          h("li", {}, "Em Project Settings → API, copie a Project URL e a chave anon public e cole aqui:"))),
+          h("li", {},
+            h("div", {}, "Crie um projeto gratuito no Supabase:"),
+            h("a", { class: "btn ghost sm", href: "https://supabase.com/dashboard/new", target: "_blank", rel: "noopener", style: "margin-top:6px;display:inline-flex" }, "Criar projeto no Supabase ↗")),
+          h("li", {},
+            h("div", {}, "No projeto, abra SQL Editor → New query, cole o código abaixo e clique em Run (cria a tabela cifrada com segurança por usuário):"),
+            h("pre", { class: "sync-sql" }, sync.SETUP_SQL),
+            copySql),
+          h("li", {}, "Em Project Settings → API, copie a Project URL e a chave anon public e cole nos campos abaixo:"))),
       rowEl("URL do projeto", url),
       rowEl("Chave anon public", key),
       h("div", { class: "btn-row" }, save));
@@ -202,14 +214,19 @@ function buildSyncBody() {
 
   if (st.status === "off") {
     // login / cadastro
+    box.appendChild(h("p", { class: "settings-hint", style: "margin:0 0 12px" },
+      "Projeto configurado ✓ Agora crie sua conta (ou entre, se já criou noutro dispositivo) — mesmo e-mail e senha em qualquer aparelho sincronizam o mesmo workspace."));
     const email = h("input", { class: "input", type: "email", placeholder: "seu@email.com", autocomplete: "username" });
-    const pass = h("input", { class: "input", type: "password", placeholder: "senha", autocomplete: "current-password" });
+    const pass = h("input", { class: "input", type: "password", placeholder: "senha (mín. 6 caracteres)", autocomplete: "current-password" });
     const msg = h("div", { style: "color:var(--danger);font-size:var(--fs-xs);min-height:14px" });
+    const setBusy = (busy) => { login.disabled = busy; signup.disabled = busy; login.textContent = busy ? "…" : "Entrar"; }
     const doAuth = (fn, label) => async () => {
       msg.textContent = "";
       if (!email.value || pass.value.length < 6) { msg.textContent = "E-mail e senha (mín. 6) obrigatórios."; return; }
+      setBusy(true);
       try { await fn(email.value.trim(), pass.value); toast(label + " ✓"); bus.emit("sync:status", sync.syncState()); }
       catch (e) { msg.textContent = e.message || String(e); }
+      finally { setBusy(false); }
     };
     const login = h("button", { class: "btn primary", onclick: doAuth(sync.signIn, "Conectado") }, "Entrar");
     const signup = h("button", { class: "btn ghost", onclick: doAuth(sync.signUp, "Conta criada") }, "Criar conta");

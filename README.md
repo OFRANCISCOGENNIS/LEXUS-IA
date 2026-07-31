@@ -18,6 +18,7 @@ O NEXUS é um workspace de produtividade estilo Notion/Craft/Capacities,
 | ◷ **Produtividade** | Pomodoro, hábitos com heatmap, lembretes locais |
 | 🏷 **Tags & Coleções** | Tags por página, páginas de tag automáticas e coleções inteligentes |
 | 🔐 **Privacidade** | Páginas privadas com PIN local, bloqueio somente-leitura, lixeira e arquivo |
+| ☁ **Sincronização entre dispositivos** (opcional) | Login por e-mail/senha, dados cifrados no dispositivo (AES-256) antes de subir a um projeto Supabase seu — o servidor só guarda texto cifrado. Selo na sidebar mostra o status e leva direto à configuração (~5 min, grátis) |
 | 📱 **PWA + Mobile** | Instalável, offline após primeira carga, sidebar em drawer no celular |
 | ⎙ **Export** | Markdown, CSV, JSON e **PDF** (impressão limpa) |
 | ◉ **Grafo de conhecimento** | Grafo força-dirigido de todas as páginas e links, com pan/zoom e destaque de vizinhança |
