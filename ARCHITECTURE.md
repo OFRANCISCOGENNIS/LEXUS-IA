@@ -79,6 +79,11 @@ Timeline/Gantt usa `startProp`/`endProp` (data) para barras arrastáveis/redimen
 Automação: `{id, name, enabled, trigger:{type:"propChanged"|"rowCreated", propId?, toValue?}, actions:[{type:"setProp"|"notify", propId?, value?, message?}]}` — executadas 100% locais em `runAutomations()` ao editar célula, mover no kanban ou criar linha.
 
 Versões: `snapshotPage(id)`, `listVersions(pageId)`, `restoreVersion(pageId, versionId)`.
+Versões de database: `snapshotDatabase(id)`, `listDbVersions(dbId)`, `restoreDbVersion(dbId, versionId)` —
+guardadas no mesmo store, com `pageId: "db:<id>"` para separar os universos sem migrar o schema.
+Fórmulas: além de números/lógica, funções de data (`hoje`, `dias`, `somarDias`, `ano`, `mes`, `dia`) e de
+texto (`concat`, `maiusc`, `minusc`, `tamanho`, `contem`, `substituir`, `vazio`). A validação mascara as
+strings antes de checar identificadores, então acentos e vírgulas no texto não derrubam a fórmula.
 Lixeira: `listTrash()`, `restoreFromTrash(trashId)`, `purgeTrash(trashId?)`.
 Settings: `getSetting(key, fallback)`, `setSetting(key, value)`.
 Busca/links: `searchAll(query,{limit})→[{kind,id,rowId?,title,icon,snippet,score,updatedAt}]`,

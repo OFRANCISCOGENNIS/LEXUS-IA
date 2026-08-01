@@ -111,7 +111,7 @@
   border: 1px solid var(--border);
   border-radius: var(--r-lg);
   box-shadow: var(--shadow-lg);
-  animation: nx-pop-in var(--t-panel) var(--ease-out) both;
+  animation: nx-pop-in-center var(--t-panel) var(--ease-out) both;
   overflow: hidden;
 }
 .modal-head {
@@ -138,7 +138,7 @@
   border-radius: var(--r-lg);
   box-shadow: var(--shadow-lg);
   overflow: hidden;
-  animation: nx-pop-in 180ms var(--ease-out) both;
+  animation: nx-pop-in-x 180ms var(--ease-out) both;
 }
 .palette-input-row {
   display: flex; align-items: center; gap: var(--sp-3);

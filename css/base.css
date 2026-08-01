@@ -45,6 +45,17 @@ kbd {
   from { opacity: 0; transform: scale(0.96) translateY(4px); }
   to   { opacity: 1; transform: scale(1) translateY(0); }
 }
+/* Variantes para elementos que já usam transform para se centralizar:
+   como `animation-fill-mode: both` mantém o transform do último keyframe,
+   usar nx-pop-in neles apagaria a centralização (o modal saía do lugar). */
+@keyframes nx-pop-in-center {
+  from { opacity: 0; transform: translate(-50%, -50%) scale(0.96); }
+  to   { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+}
+@keyframes nx-pop-in-x {
+  from { opacity: 0; transform: translateX(-50%) scale(0.96) translateY(4px); }
+  to   { opacity: 1; transform: translateX(-50%) scale(1) translateY(0); }
+}
 @keyframes nx-slide-up {
   from { opacity: 0; transform: translateY(10px); }
   to   { opacity: 1; transform: translateY(0); }

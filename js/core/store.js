@@ -264,6 +264,39 @@ export async function restoreVersion(pageId, versionId) {
   updatePage(pageId, { blocks: structuredClone(v.blocks) });
 }
 
+/* ── Versões de databases ──
+   Reaproveitam o mesmo object store; o índice é por pageId, então gravamos
+   `pageId: "db:<id>"` para separar os dois universos sem migrar o schema. */
+const dbVerKey = (id) => "db:" + id;
+
+export async function snapshotDatabase(id) {
+  const d = databases.get(id);
+  if (!d) return;
+  const all = await idb.getAllByIndex("versions", "pageId", dbVerKey(id));
+  const last = all.sort((a, b) => b.ts - a.ts)[0];
+  const snap = JSON.stringify({ p: d.properties, r: d.rows });
+  if (last && JSON.stringify({ p: last.properties, r: last.rows }) === snap) return; // sem mudanças
+  await idb.put("versions", {
+    id: uid("v"), pageId: dbVerKey(id), ts: Date.now(),
+    title: d.name, properties: structuredClone(d.properties), rows: structuredClone(d.rows),
+  });
+  const list = (await idb.getAllByIndex("versions", "pageId", dbVerKey(id))).sort((a, b) => b.ts - a.ts);
+  for (const v of list.slice(20)) await idb.del("versions", v.id);
+}
+
+export const listDbVersions = async (dbId) =>
+  (await idb.getAllByIndex("versions", "pageId", dbVerKey(dbId))).sort((a, b) => b.ts - a.ts);
+
+export async function restoreDbVersion(dbId, versionId) {
+  const v = await idb.get("versions", versionId);
+  const d = databases.get(dbId);
+  if (!v || !d) return;
+  await snapshotDatabase(dbId); // guarda o estado atual antes de sobrescrever
+  d.properties = structuredClone(v.properties);
+  d.rows = structuredClone(v.rows);
+  touchDatabase(dbId);
+}
+
 /* ── Databases ── */
 export const listDatabases = () =>
   [...databases.values()].sort((a, b) => b.updatedAt - a.updatedAt);

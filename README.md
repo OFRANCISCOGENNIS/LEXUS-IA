@@ -13,10 +13,11 @@ O NEXUS é um workspace de produtividade estilo Notion/Craft/Capacities,
 | 📝 **Editor de blocos** | Slash menu (`/`), formatação inline, wiki-links `[[...]]` com backlinks, **menções `@página`/`@data`**, **comentários por bloco** (resolver/reabrir), **database inline**, **multi-seleção de blocos** (Esc · Shift+↑↓ · ações em massa), desfazer/refazer, colunas, equações (KaTeX), embeds, modo apresentação, drag & drop com FLIP, histórico de versões com diff, sumário (TOC), capas, tags, bloco de gráfico |
 | 🗂 **Páginas dentro de páginas** | Hierarquia ilimitada de sub-páginas, árvore expansível na sidebar com indentação, auto-expande ao navegar, exclusão em cascata (com confirmação) |
 | ✍ **Modo foco/máquina de escrever** | Isola o parágrafo atual, HUD com contador de palavras e meta de escrita, scroll centralizado |
-| ▦ **Databases** | Views Tabela (virtualizada — dezenas de milhares de linhas), Kanban, Galeria, Lista, Calendário e **Timeline/Gantt**; propriedades select, data, número, URL, checkbox, **fórmula, relação (com inversa bidirecional), rollup, arquivo/imagem, criado/editado em**; **sub-itens** aninhados; **templates de linha**; filtros simples e avançados (E/OU), ordenação, agrupamento, **automações locais** (gatilho → ação), export CSV |
+| ▦ **Databases** | Views Tabela (virtualizada — dezenas de milhares de linhas), Kanban, Galeria, Lista, Calendário e **Timeline/Gantt**; propriedades select, data, número, URL, checkbox, **fórmula, relação (com inversa bidirecional), rollup, arquivo/imagem, criado/editado em**; **sub-itens** aninhados; **templates de linha**; filtros simples e avançados (E/OU), ordenação, agrupamento, **automações locais** (gatilho → ação), **desfazer/refazer**, **histórico de versões**, **import/export CSV** |
 | ✓ **Tarefas & Projetos** | Agrega prazos das databases e checklists das páginas em Hoje/Semana/Atrasadas |
 | ◷ **Produtividade** | Pomodoro, hábitos com heatmap, lembretes locais |
-| 🏷 **Tags & Coleções** | Tags por página, páginas de tag automáticas e coleções inteligentes |
+| 🏷 **Tags & Coleções** | Tags por página, páginas de tag automáticas e coleções inteligentes — inclusive **coleções próprias** (texto, tag, favoritas, período) |
+| ▤ **Templates** | 62 modelos prontos + **salvar qualquer página como template** |
 | 🔐 **Privacidade** | Páginas privadas com PIN local, bloqueio somente-leitura, lixeira e arquivo |
 | ☁ **Sincronização entre dispositivos** (opcional) | Login por e-mail/senha, dados cifrados no dispositivo (AES-256) antes de subir a um projeto Supabase seu — o servidor só guarda texto cifrado. Selo na sidebar mostra o status e leva direto à configuração (~5 min, grátis) |
 | 📱 **PWA + Mobile** | Instalável, offline após primeira carga, sidebar em drawer no celular |

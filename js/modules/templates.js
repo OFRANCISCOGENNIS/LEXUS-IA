@@ -1,9 +1,9 @@
 // ═══════════════ NEXUS · Galeria de templates ═══════════════
 
-import { createPage, createDatabase, makeBlock, makeRow, makeDatabase } from "../core/store.js";
+import { createPage, createDatabase, makeBlock, makeRow, makeDatabase, getSetting, setSetting } from "../core/store.js";
 import { navigate } from "../core/router.js";
 import { h, uid, todayKey } from "../core/utils.js";
-import { toast } from "../core/ui.js";
+import { toast, confirmDialog } from "../core/ui.js";
 
 const hoje = () => new Date().toLocaleDateString("pt-BR", { weekday: "long", day: "numeric", month: "long" });
 const semana = () => {
@@ -224,11 +224,12 @@ export default {
     wrap.appendChild(h("h1", { class: "home-greeting" }, "Templates"));
     wrap.appendChild(h("p", { class: "home-date" }, "Comece com estrutura — personalize à vontade."));
 
-    const section = (title, tpls, isDb) => {
+    const section = (title, tpls, isDb, { removable = false, onChange } = {}) => {
+      if (!tpls.length) return;
       wrap.appendChild(h("h2", { class: "home-section-title" }, title));
       const grid = h("div", { class: "tpl-grid" });
       tpls.forEach((t, i) => {
-        grid.appendChild(h("button", {
+        const card = h("button", {
           class: "card hoverable tpl-card", style: `animation-delay:${i * 40}ms`,
           onclick: () => {
             const created = t.make();
@@ -240,13 +241,41 @@ export default {
           h("div", { class: "tpl-body" },
             h("div", { class: "tpl-name" }, `${t.icon} ${t.name}`),
             h("div", { class: "tpl-desc" }, t.desc)),
-          h("span", { class: "btn sm tpl-use" }, "Usar")));
+          h("span", { class: "btn sm tpl-use" }, "Usar"));
+        if (removable) {
+          card.appendChild(h("button", {
+            class: "icon-btn tpl-del", title: "Excluir template",
+            onclick: async (e) => {
+              e.stopPropagation();
+              const ok = await confirmDialog({ title: "Excluir template?", message: `“${t.name}” será removido da galeria. As páginas já criadas não são afetadas.`, confirmText: "Excluir", danger: true });
+              if (!ok) return;
+              setSetting("userTemplates", (getSetting("userTemplates", []) || []).filter((x) => x.id !== t.id));
+              toast("Template excluído");
+              onChange?.();
+            },
+          }, "✕"));
+        }
+        grid.appendChild(card);
       });
       wrap.appendChild(grid);
     };
 
+    // templates salvos pelo usuário (a partir de uma página existente)
+    const mine = (getSetting("userTemplates", []) || []).map((t) => ({
+      ...t, preview: "doc",
+      make: () => createPage({
+        title: t.name, icon: t.icon || "▢",
+        tags: [...(t.tags || [])],
+        blocks: structuredClone(t.blocks || []).map((b) => ({ ...b, id: uid("b") })),
+      }),
+    }));
+    section("Meus templates", mine, false, { removable: true, onChange: () => navigate("templates") });
     section("Páginas", PAGE_TEMPLATES, false);
     section("Databases", DB_TEMPLATES, true);
+    if (!mine.length) {
+      wrap.appendChild(h("p", { class: "settings-hint", style: "margin-top:20px" },
+        "Dica: em qualquer página, use ⋯ → “Salvar como template” para que ela apareça aqui em “Meus templates”."));
+    }
     container.appendChild(wrap);
   },
   unmount() {},

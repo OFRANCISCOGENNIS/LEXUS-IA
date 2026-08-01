@@ -2,10 +2,10 @@
 
 import {
   getDatabase, updateDatabase, touchDatabase, deleteDatabase, makeRow, listDatabases,
-  getSetting, setSetting,
+  getSetting, setSetting, snapshotDatabase, listDbVersions, restoreDbVersion,
 } from "../core/store.js";
 import { navigate } from "../core/router.js";
-import { h, uid, escapeHtml, fmtDate, flip, download, debounce, todayKey } from "../core/utils.js";
+import { h, uid, escapeHtml, fmtDate, flip, download, debounce, todayKey, isMac, fmtRelative } from "../core/utils.js";
 import { showMenu, closeMenus, toast, confirmDialog, promptDialog, emojiPicker, showModal } from "../core/ui.js";
 
 const PROP_TYPES = [
@@ -50,19 +50,78 @@ export default {
       viewId: db.views.find((v) => v.id === savedView)?.id || db.views[0]?.id,
       quickFilter: "",
       expanded: new Set(),
+      undo: [], redo: [], cleanups: [],
     };
+    state._committed = snapshotState();
     render();
     setupTopbar(db);
+
+    snapshotDatabase(db.id);
+    const snapTimer = setInterval(() => snapshotDatabase(db.id), 180000);
+    state.cleanups.push(() => clearInterval(snapTimer));
+
+    // Desfazer / Refazer na database (Ctrl+Z · Ctrl+Y · Ctrl+Shift+Z)
+    const onHistKey = (e) => {
+      const mod = isMac ? e.metaKey : e.ctrlKey;
+      if (!mod || !state) return;
+      if (document.activeElement?.isContentEditable || /INPUT|TEXTAREA/.test(document.activeElement?.tagName || "")) return;
+      const k = e.key.toLowerCase();
+      if (k === "z" && !e.shiftKey) { e.preventDefault(); undoDb(); }
+      else if (k === "y" || (k === "z" && e.shiftKey)) { e.preventDefault(); redoDb(); }
+    };
+    addEventListener("keydown", onHistKey, true);
+    state.cleanups.push(() => removeEventListener("keydown", onHistKey, true));
   },
   unmount() {
     closeMenus();
     state?._virtCleanup?.();
+    state?.cleanups?.forEach((fn) => fn());
     document.getElementById("topbar-actions").innerHTML = "";
     state = null;
   },
 };
 
-const commit = () => touchDatabase(state.db.id);
+/* ═══════════ Desfazer / Refazer da database ═══════════
+   Guarda propriedades + linhas (o que o usuário percebe como "o conteúdo").
+   Views e nome ficam de fora de propósito: mudar de aba não é uma edição. */
+const snapshotState = () => JSON.stringify({ p: state.db.properties, r: state.db.rows });
+
+function recordDbHistory() {
+  if (!state || state._restoring) return;
+  const cur = snapshotState();
+  if (cur === state._committed) return;
+  state.undo.push(state._committed);
+  if (state.undo.length > 100) state.undo.shift();
+  state.redo.length = 0;
+  state._committed = cur;
+}
+
+function applySnapshot(snap) {
+  state._restoring = true;
+  const { p, r } = JSON.parse(snap);
+  state.db.properties = p;
+  state.db.rows = r;
+  state._committed = snap;
+  touchDatabase(state.db.id);
+  render();
+  state._restoring = false;
+}
+
+function undoDb() {
+  if (!state?.undo.length) { toast("Nada para desfazer", { duration: 1000 }); return; }
+  state.redo.push(snapshotState());
+  applySnapshot(state.undo.pop());
+  toast("Desfeito", { duration: 1000 });
+}
+
+function redoDb() {
+  if (!state?.redo.length) return;
+  state.undo.push(snapshotState());
+  applySnapshot(state.redo.pop());
+  toast("Refeito", { duration: 1000 });
+}
+
+const commit = () => { recordDbHistory(); touchDatabase(state.db.id); };
 const currentView = () => state.db.views.find((v) => v.id === state.viewId) || state.db.views[0];
 
 function setupTopbar(db) {
@@ -75,7 +134,11 @@ function setupTopbar(db) {
       if (name != null) { updateDatabase(db.id, { name }); render(); }
     } },
     { icon: "⬇", title: "Exportar CSV", action: () => exportCsv(db) },
+    { icon: "⬆", title: "Importar CSV", action: () => importCsvFlow() },
     { icon: "⚡", title: "Automações" + ((db.automations?.length) ? ` · ${db.automations.length}` : ""), action: () => automationsModal() },
+    { sep: true },
+    { icon: "↺", title: "Desfazer", kbd: "⌘Z", action: () => undoDb() },
+    { icon: "↻", title: "Histórico de versões", action: () => showDbHistory() },
     { sep: true },
     { icon: "🗑", title: "Excluir database", danger: true, action: async () => {
       const ok = await confirmDialog({ title: "Excluir database?", message: "Ela irá para a lixeira e poderá ser restaurada.", confirmText: "Excluir", danger: true });
@@ -99,6 +162,145 @@ function exportCsv(db) {
   }).join(","));
   download(`${db.name || "database"}.csv`, [header, ...lines].join("\n"), "text/csv");
   toast("CSV exportado");
+}
+
+/* ═══════════ Importar CSV ═══════════
+   Parser que respeita aspas, vírgulas e quebras de linha dentro do campo —
+   um CSV exportado de planilha entra sem precisar de limpeza manual. */
+export function parseCsv(text) {
+  const rows = [];
+  let row = [], field = "", quoted = false;
+  const s = text.replace(/\r\n?/g, "\n");
+  for (let i = 0; i < s.length; i++) {
+    const c = s[i];
+    if (quoted) {
+      if (c === '"') {
+        if (s[i + 1] === '"') { field += '"'; i++; }   // aspas escapadas
+        else quoted = false;
+      } else field += c;
+    } else if (c === '"') quoted = true;
+    else if (c === ",") { row.push(field); field = ""; }
+    else if (c === "\n") { row.push(field); rows.push(row); row = []; field = ""; }
+    else field += c;
+  }
+  if (field !== "" || row.length) { row.push(field); rows.push(row); }
+  return rows.filter((r) => r.some((c) => c.trim() !== ""));
+}
+
+/* adivinha o tipo da coluna pelos valores (data → número → checkbox → texto) */
+function guessType(values) {
+  const vals = values.filter((v) => v.trim() !== "");
+  if (!vals.length) return "text";
+  if (vals.every((v) => /^\d{4}-\d{2}-\d{2}$/.test(v.trim()))) return "date";
+  if (vals.every((v) => /^-?[\d.,]+$/.test(v.trim()) && !isNaN(parseFloat(v.replace(",", "."))))) return "number";
+  if (vals.every((v) => /^(sim|não|nao|true|false|x|)$/i.test(v.trim()))) return "checkbox";
+  return "text";
+}
+
+function importCsvFlow() {
+  const input = h("input", { type: "file", accept: ".csv,text/csv", style: "display:none" });
+  input.addEventListener("change", async () => {
+    const f = input.files?.[0];
+    input.remove();
+    if (!f) return;
+    const rows = parseCsv(await f.text());
+    if (rows.length < 2) { toast("CSV vazio ou sem linhas de dados", { type: "warn" }); return; }
+    csvPreviewModal(rows);
+  });
+  document.body.appendChild(input);
+  input.click();
+}
+
+function csvPreviewModal(rows) {
+  const db = state.db;
+  const header = rows[0].map((c) => c.trim());
+  const body = rows.slice(1);
+
+  // mapeia cada coluna do CSV para uma propriedade existente (por nome) ou nova
+  const plan = header.map((name, i) => {
+    const existing = db.properties.find((p) => p.name.toLowerCase() === name.toLowerCase() && !COMPUTED_PROPS.has(p.type));
+    return { name, index: i, propId: existing?.id || null, type: existing?.type || guessType(body.map((r) => r[i] ?? "")) };
+  });
+
+  const table = h("table", { class: "dbv-table", style: "margin-bottom:10px" });
+  const trh = h("tr", {});
+  plan.forEach((c) => trh.appendChild(h("th", {}, c.name + (c.propId ? "" : ` (nova · ${TYPE_LABEL[c.type] || c.type})`))));
+  table.appendChild(h("thead", {}, trh));
+  const tb = h("tbody", {});
+  body.slice(0, 5).forEach((r) => {
+    const tr = h("tr", {});
+    plan.forEach((c) => tr.appendChild(h("td", {}, (r[c.index] ?? "").slice(0, 30))));
+    tb.appendChild(tr);
+  });
+  table.appendChild(tb);
+
+  const doImport = h("button", { class: "btn primary" }, `Importar ${body.length} ${body.length === 1 ? "linha" : "linhas"}`);
+  const m = showModal({
+    title: "Importar CSV",
+    body: h("div", {},
+      h("p", { class: "settings-hint", style: "margin-bottom:10px" },
+        "Colunas com o mesmo nome são reaproveitadas; as demais são criadas. Prévia das primeiras linhas:"),
+      h("div", { style: "overflow-x:auto" }, table)),
+    footer: [h("button", { class: "btn ghost", onclick: () => m.close() }, "Cancelar"), doImport],
+    width: 640,
+  });
+
+  doImport.onclick = () => {
+    // cria as colunas que faltam
+    plan.forEach((c) => {
+      if (c.propId) return;
+      const p = { id: uid("pr"), name: c.name || "Coluna", type: c.type };
+      if (c.type === "select") p.options = [];
+      db.properties.push(p);
+      c.propId = p.id;
+    });
+    // a 1ª coluna do CSV alimenta o título, se a database ainda não tiver mapeamento
+    const titleProp = db.properties.find((p) => p.type === "title");
+    body.forEach((r) => {
+      const values = {};
+      plan.forEach((c) => {
+        const raw = (r[c.index] ?? "").trim();
+        if (raw === "") return;
+        if (c.type === "number") values[c.propId] = parseFloat(raw.replace(",", ".")) || 0;
+        else if (c.type === "checkbox") values[c.propId] = /^(sim|true|x)$/i.test(raw);
+        else values[c.propId] = raw;
+      });
+      if (titleProp && !values[titleProp.id]) values[titleProp.id] = (r[0] ?? "").trim();
+      db.rows.push(makeRow(db, values));
+    });
+    commit(); m.close(); render();
+    toast(`${body.length} ${body.length === 1 ? "linha importada" : "linhas importadas"} ✓`);
+  };
+}
+
+const TYPE_LABEL = Object.fromEntries(PROP_TYPES.map((t) => [t.type, t.name]));
+
+/* ═══════════ Histórico de versões da database ═══════════ */
+async function showDbHistory() {
+  const db = state.db;
+  await snapshotDatabase(db.id);
+  const versions = await listDbVersions(db.id);
+  const list = h("div", { style: "display:flex;flex-direction:column;gap:6px;max-height:340px;overflow-y:auto" });
+  if (!versions.length) list.appendChild(h("div", { class: "settings-hint" }, "Nenhuma versão salva ainda."));
+  versions.forEach((v) => {
+    list.appendChild(h("div", { class: "auto-card" },
+      h("div", { class: "auto-body" },
+        h("div", { class: "auto-name" }, fmtRelative(v.ts)),
+        h("div", { class: "auto-desc" }, `${v.rows.length} ${v.rows.length === 1 ? "linha" : "linhas"} · ${v.properties.length} propriedades`)),
+      h("button", { class: "btn ghost sm", onclick: async () => {
+        const ok = await confirmDialog({
+          title: "Restaurar esta versão?",
+          message: "As linhas e propriedades atuais serão substituídas. O estado de agora vira uma versão, então dá para voltar.",
+          confirmText: "Restaurar",
+        });
+        if (!ok) return;
+        await restoreDbVersion(db.id, v.id);
+        state.db = getDatabase(db.id);
+        state._committed = snapshotState();
+        m.close(); render(); toast("Versão restaurada ✓");
+      } }, "Restaurar")));
+  });
+  const m = showModal({ title: "↻ Histórico da database", body: list, width: 500 });
 }
 
 /* ═══════════ Render raiz ═══════════ */
@@ -1298,19 +1500,57 @@ function evalFormula(prop, row, db) {
     return JSON.stringify(String(v ?? ""));
   });
   expr = expr.replace(/\bif\s*\(/gi, "iff(");
-  // whitelist de caracteres e identificadores
-  if (!/^[\s0-9.+\-*/%(),<>=!?:"'\]\[a-zA-Z_]*$/.test(expr)) return "⚠";
-  const idents = expr.match(/[a-zA-Z_]\w*/g) || [];
-  const allowed = new Set(["iff", "round", "abs", "min", "max", "floor", "ceil", "true", "false"]);
-  if (idents.some((id) => !allowed.has(id))) return "⚠";
+  // Valida só o CÓDIGO: o texto entre aspas é dado do usuário (pode ter
+  // acento, vírgula, qualquer coisa) e não deve passar pela whitelist.
+  const masked = expr.replace(/"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'/g, '""');
+  if (!/^[\s0-9.+\-*/%(),<>=!?:"'\]\[a-zA-Z_]*$/.test(masked)) return "⚠";
+  const idents = masked.match(/[a-zA-Z_]\w*/g) || [];
+  // literais são permitidos, mas não podem virar nome de parâmetro (reservados)
+  if (idents.some((id) => !FORMULA_FNS.has(id) && !FORMULA_LITERALS.has(id))) return "⚠";
   try {
-    const fn = new Function("iff", "round", "abs", "min", "max", "floor", "ceil",
-      `"use strict"; return (${expr});`);
-    const res = fn((c, a, b) => (c ? a : b), Math.round, Math.abs, Math.min, Math.max, Math.floor, Math.ceil);
+    const names = [...FORMULA_FNS.keys()];
+    const fn = new Function(...names, `"use strict"; return (${expr});`);
+    const res = fn(...names.map((n) => FORMULA_FNS.get(n)));
     if (typeof res === "number") return Number.isFinite(res) ? (Number.isInteger(res) ? String(res) : res.toFixed(2)) : "⚠";
+    if (typeof res === "boolean") return res ? "sim" : "não";
     return String(res);
   } catch { return "⚠"; }
 }
+
+/* Funções disponíveis nas fórmulas — números, datas e texto.
+   Datas trafegam como "YYYY-MM-DD" (o mesmo formato das células). */
+const dParse = (s) => {
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(s || "").trim());
+  return m ? new Date(+m[1], +m[2] - 1, +m[3]) : null;
+};
+const dFmt = (dt) => `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, "0")}-${String(dt.getDate()).padStart(2, "0")}`;
+
+const FORMULA_FNS = new Map(Object.entries({
+  // lógica e números
+  iff: (c, a, b) => (c ? a : b),
+  round: Math.round, abs: Math.abs, min: Math.min, max: Math.max, floor: Math.floor, ceil: Math.ceil,
+  raiz: Math.sqrt,
+  // datas
+  hoje: () => todayKey(),
+  dias: (a, b) => {           // dias de `a` até `b` (padrão: até hoje)
+    const d1 = dParse(a), d2 = b === undefined ? new Date() : dParse(b);
+    if (!d1 || !d2) return 0;
+    return Math.round((d2.setHours(0, 0, 0, 0) - d1.setHours(0, 0, 0, 0)) / 86400000);
+  },
+  somarDias: (a, n) => { const d = dParse(a); if (!d) return ""; d.setDate(d.getDate() + (Number(n) || 0)); return dFmt(d); },
+  ano: (a) => dParse(a)?.getFullYear() ?? 0,
+  mes: (a) => (dParse(a) ? dParse(a).getMonth() + 1 : 0),
+  dia: (a) => dParse(a)?.getDate() ?? 0,
+  // texto
+  concat: (...xs) => xs.map((x) => String(x ?? "")).join(""),
+  maiusc: (s) => String(s ?? "").toUpperCase(),
+  minusc: (s) => String(s ?? "").toLowerCase(),
+  tamanho: (s) => String(s ?? "").length,
+  contem: (s, t) => String(s ?? "").toLowerCase().includes(String(t ?? "").toLowerCase()),
+  substituir: (s, de, para) => String(s ?? "").split(String(de ?? "")).join(String(para ?? "")),
+  vazio: (s) => String(s ?? "").trim() === "",
+}));
+const FORMULA_LITERALS = new Set(["true", "false", "null", "undefined"]);
 
 function textCell(cls, value, set, placeholder = "", fmt = (s) => s) {
   const cell = h("div", { class: cls });

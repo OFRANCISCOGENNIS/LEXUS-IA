@@ -478,3 +478,15 @@
   .home-hero-row { flex-wrap: wrap; }
   .ht-origin { display: none; }
 }
+
+/* botão de excluir em "Meus templates" */
+.tpl-card { position: relative; }
+.tpl-del {
+  position: absolute; top: 6px; right: 6px; z-index: 2;
+  width: 24px; height: 24px; font-size: 11px;
+  background: var(--glass); border: 1px solid var(--border);
+  opacity: 0; transition: opacity var(--t-fast), color var(--t-fast);
+}
+.tpl-card:hover .tpl-del { opacity: 1; }
+.tpl-del:hover { color: var(--danger); border-color: var(--danger-soft); }
+@media (hover: none) { .tpl-del { opacity: 1; } }

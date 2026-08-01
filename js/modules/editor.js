@@ -2202,6 +2202,18 @@ function setupTopbar(page) {
       action: () => updatePage(page.id, { favorite: !page.favorite }) },
     { icon: "＋", title: "Nova sub-página", action: () => { const c = createPage({ parentId: page.id }); navigate("page", c.id); } },
     { icon: "⧉", title: "Duplicar página", action: () => { const c = duplicatePage(page.id); navigate("page", c.id); } },
+    { icon: "▤", title: "Salvar como template", action: async () => {
+      const name = await promptDialog({ title: "Nome do template", value: page.title || "Meu template" });
+      if (name == null) return;
+      const saved = getSetting("userTemplates", []) || [];
+      saved.push({
+        id: uid("ut"), name: name || "Template", icon: page.icon || "▢",
+        desc: `${(page.blocks || []).length} blocos · criado de “${page.title || "Sem título"}”`,
+        blocks: structuredClone(page.blocks || []), tags: [...(page.tags || [])],
+      });
+      setSetting("userTemplates", saved);
+      toast("Template salvo — veja na galeria de Templates");
+    } },
     { icon: page.locked ? "🔓" : "🔒", title: page.locked ? "Desbloquear página" : "Bloquear página (somente leitura)",
       action: () => { updatePage(page.id, { locked: !page.locked }); navigate("page", page.id); } },
     { icon: page.private ? "👁" : "🔐", title: page.private ? "Remover privacidade" : "Tornar privada (PIN)",
