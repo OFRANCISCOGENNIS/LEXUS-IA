@@ -495,17 +495,46 @@ function renderList(root) {
   const { db } = state;
   const rows = visibleRows();
   if (!rows.length) return emptyView(root, "☰", "Sem itens para exibir.");
+
+  // sub-itens aninham sob os pais, com indentação e caret (como na tabela)
+  const kidsMap = new Map();
+  rows.forEach((r) => {
+    if (!r.parentId) return;
+    if (!kidsMap.has(r.parentId)) kidsMap.set(r.parentId, []);
+    kidsMap.get(r.parentId).push(r);
+  });
+  const childrenOf = (id) => kidsMap.get(id) || [];
+
   const list = h("div", { class: "db-list card" });
-  rows.forEach((row) => {
+  const addItem = (row, depth) => {
     const meta = h("div", { class: "dl-meta" });
     db.properties.forEach((p) => { if (p.id !== "title") { const b = propBadge(row, p); if (b) meta.appendChild(b); } });
-    const item = h("div", { class: "db-list-item", dataset: { rowId: row.id } },
+    const kids = childrenOf(row.id);
+    const open = state.expanded.has(row.id);
+    const caret = h("button", {
+      class: "row-expand" + (kids.length ? "" : " empty"),
+      title: kids.length ? (open ? "Recolher" : `Expandir (${kids.length})`) : "",
+      onclick: (e) => {
+        e.stopPropagation();
+        if (!kids.length) return;
+        open ? state.expanded.delete(row.id) : state.expanded.add(row.id);
+        renderView();
+      },
+    }, kids.length ? (open ? "▾" : "▸") : "");
+    const item = h("div", {
+      class: "db-list-item", dataset: { rowId: row.id },
+      style: depth ? `padding-left:${12 + depth * 18}px` : "",
+    },
+      caret,
       h("span", { class: "dl-title" }, row.values.title || "Sem nome"),
       meta,
       h("button", { class: "icon-btn row-menu-btn", "aria-label": "Opções", onclick: (e) => rowMenu(e, row) }, "⋯"));
     item.addEventListener("dblclick", () => editTitle(row));
     list.appendChild(item);
-  });
+    if (open) kids.forEach((c) => addItem(c, depth + 1));
+  };
+  rows.filter((r) => !r.parentId).forEach((row) => addItem(row, 0));
+
   root.appendChild(list);
   root.appendChild(newRowBtn());
 }
@@ -1455,6 +1484,14 @@ function kanbanCard(row, groupProp) {
     h("div", { class: "kc-head" }, h("div", { class: "kc-title" }, title), menuBtn),
     meta
   );
+  // sub-itens: contador de concluídos (usa a 1ª propriedade checkbox, se houver)
+  const kids = db.rows.filter((r) => r.parentId === row.id);
+  if (kids.length) {
+    const check = db.properties.find((p) => p.type === "checkbox");
+    const done = check ? kids.filter((k) => k.values[check.id]).length : 0;
+    card.appendChild(h("div", { class: "kc-subitems", title: `${kids.length} sub-${kids.length === 1 ? "item" : "itens"}` },
+      "↳ " + (check ? `${done}/${kids.length}` : `${kids.length}`) + " sub-" + (kids.length === 1 ? "item" : "itens")));
+  }
   card.addEventListener("dragstart", (e) => {
     e.dataTransfer.setData("text/nexus-row", row.id);
     e.dataTransfer.effectAllowed = "move";

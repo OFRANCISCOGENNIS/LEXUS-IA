@@ -16,7 +16,7 @@ import {
   positionFloating, fmtRelative, fmtDate, readingTime, clamp, isMac,
 } from "../core/utils.js";
 import { showMenu, closeMenus, toast, showModal, emojiPicker, confirmDialog, promptDialog } from "../core/ui.js";
-import { pageToMarkdown } from "../core/markdown.js";
+import { pageToMarkdown, pageToHtml } from "../core/markdown.js";
 import { hasPin, isUnlocked, setPin, verifyPin } from "../core/privacy.js";
 
 /* ── Definições de blocos para o slash menu ── */
@@ -2210,6 +2210,10 @@ function setupTopbar(page) {
     { icon: "⬇", title: "Exportar como Markdown", action: () => {
       import("../core/utils.js").then(({ download }) =>
         download((page.title || "pagina") + ".md", pageToMarkdown(page), "text/markdown"));
+    } },
+    { icon: "⬇", title: "Exportar como HTML", action: () => {
+      import("../core/utils.js").then(({ download }) =>
+        download((page.title || "pagina") + ".html", pageToHtml(page), "text/html"));
     } },
     { icon: "⎙", title: "Exportar como PDF (imprimir)", action: () => {
       document.title = page.title || "NEXUS";

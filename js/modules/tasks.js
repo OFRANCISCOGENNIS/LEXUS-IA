@@ -12,7 +12,7 @@ export default {
   unmount() {},
 };
 
-function collectTasks() {
+export function collectTasks() {
   const tasks = [];
 
   // 1) linhas de database com propriedade de data

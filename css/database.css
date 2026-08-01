@@ -366,3 +366,10 @@ tr:hover .row-menu-btn { opacity: 1; }
 .db-cell.cell-file:hover .file-x { opacity: 1; }
 .file-x:hover { color: var(--danger); background: var(--danger-soft); }
 @media (hover: none) { .file-x { opacity: 1; } }
+
+/* sub-itens no Kanban e na Lista */
+.kanban-card .kc-subitems {
+  margin-top: 6px; font-size: 10.5px; font-weight: 600;
+  color: var(--text-faint);
+}
+.db-list-item .row-expand { margin-right: 2px; }

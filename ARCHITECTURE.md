@@ -26,7 +26,7 @@ js/
     router.js         navigate(name, id?), registerRoute, parseHash(), currentRoute()
     ui.js             toast(msg,{type}), showMenu(anchor, items, opts), closeMenus(), showModal({title,body,footer,width})→{close,body}, confirmDialog({...})→Promise<bool>, promptDialog({...})→Promise<string|null>, emojiPicker(anchor, onPick)
     utils.js          h(tag,attrs,...children), uid, debounce, throttle, clamp, escapeHtml, stripHtml, sanitizeInline, fuzzyScore, highlightMatch, todayKey, fmtDate, fmtRelative, flip(container,mutate), positionFloating, isMac, modKey, download, countWords, readingTime
-    markdown.js       pageToMarkdown(page), blocksToMarkdown(blocks), markdownToBlocks(md)
+    markdown.js       pageToMarkdown(page), pageToHtml(page) — HTML autocontido, sem rede —, blocksToMarkdown(blocks), markdownToBlocks(md)
   modules/            um módulo por rota — default export { mount(container, params), unmount() }
   ai/                 engine WebLLM + worker
 ```
