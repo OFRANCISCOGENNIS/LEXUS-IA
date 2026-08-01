@@ -547,3 +547,52 @@
 }
 .dbv-add::placeholder { color: var(--text-faint); }
 .dbv-add:focus { background: var(--surface-2); }
+
+/* ═══════════════ Comentários em blocos ═══════════════ */
+.comment-marker {
+  position: absolute; right: -30px; top: 2px;
+  display: inline-flex; align-items: center; gap: 2px;
+  font-size: 12px; line-height: 1;
+  padding: 3px 5px; border-radius: var(--r-sm);
+  opacity: 0.55; transition: opacity var(--t-fast), background var(--t-fast);
+}
+.comment-marker:hover { opacity: 1; background: var(--surface-hover); }
+.comment-marker.resolved { opacity: 0.28; filter: grayscale(1); }
+.comment-marker .cm-count { font-size: 9.5px; font-weight: 800; color: var(--accent-text); }
+.block:hover .comment-marker { opacity: 1; }
+
+.comment-panel {
+  position: absolute; z-index: 130; width: min(320px, calc(100vw - 24px));
+  display: flex; flex-direction: column;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--r-md); box-shadow: var(--shadow-pop);
+  animation: nx-fade-in 140ms var(--ease-out);
+  overflow: hidden;
+}
+.comment-head {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 8px 10px 8px 12px; border-bottom: 1px solid var(--border);
+  font-size: var(--fs-sm); font-weight: 700;
+}
+.comment-list { max-height: 260px; overflow-y: auto; padding: 6px; display: flex; flex-direction: column; gap: 4px; }
+.comment-empty { color: var(--text-faint); font-size: var(--fs-sm); padding: 10px 6px; text-align: center; }
+.comment-item { padding: 8px 10px; border-radius: var(--r-sm); background: var(--surface-2); }
+.comment-item.resolved { opacity: 0.55; }
+.comment-item.resolved .comment-text { text-decoration: line-through; }
+.comment-text { font-size: var(--fs-sm); line-height: 1.5; white-space: pre-wrap; word-break: break-word; }
+.comment-foot { display: flex; align-items: center; gap: 8px; margin-top: 6px; }
+.comment-time { font-size: 10.5px; color: var(--text-faint); flex: 1; }
+.comment-act {
+  font-size: 10.5px; font-weight: 700; color: var(--text-3);
+  padding: 2px 5px; border-radius: 4px; transition: color var(--t-fast), background var(--t-fast);
+}
+.comment-act:hover { color: var(--accent-text); background: var(--accent-softer); }
+.comment-act.danger:hover { color: var(--danger); background: var(--danger-soft); }
+.comment-compose { display: flex; flex-direction: column; gap: 6px; padding: 8px; border-top: 1px solid var(--border); }
+.comment-input { font-size: var(--fs-sm); resize: vertical; min-height: 46px; }
+.comment-compose .btn { align-self: flex-end; }
+
+/* no celular a alça de comentário não cabe fora da coluna */
+@media (max-width: 720px) {
+  .comment-marker { right: 0; top: -2px; opacity: 1; }
+}

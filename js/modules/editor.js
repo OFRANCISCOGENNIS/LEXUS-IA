@@ -584,7 +584,106 @@ function renderBlock(block, { num = 0, inToggle = false } = {}) {
     el.appendChild(col);
   }
 
+  // marcador de comentários (só quando existirem)
+  const marker = commentMarker(block);
+  if (marker) el.appendChild(marker);
+
   return el;
+}
+
+/* ═══════════ Comentários em blocos ═══════════
+   Anotações presas a um bloco (block.props.comments). Ficam no dispositivo
+   como todo o resto; servem para revisar textos, deixar lembretes e marcar
+   pendências sem sujar o conteúdo. */
+const comments = (block) => block.props?.comments || [];
+const openComments = (block) => comments(block).filter((c) => !c.resolved);
+
+function commentMarker(block) {
+  const all = comments(block);
+  if (!all.length) return null;
+  const pend = all.filter((c) => !c.resolved).length;
+  return h("button", {
+    class: "comment-marker" + (pend ? "" : " resolved"),
+    title: pend ? `${pend} comentário${pend > 1 ? "s" : ""} em aberto` : "Comentários resolvidos",
+    onclick: (e) => { e.stopPropagation(); commentPopover(e.currentTarget, block); },
+  }, "💬", pend ? h("span", { class: "cm-count" }, String(pend)) : null);
+}
+
+function commentPopover(anchor, block) {
+  closeMenus();
+  block.props = block.props || {};
+  block.props.comments = block.props.comments || [];
+
+  const panel = h("div", { class: "comment-panel", role: "dialog", "aria-label": "Comentários do bloco" });
+  const list = h("div", { class: "comment-list" });
+  const input = h("textarea", { class: "textarea comment-input", rows: 2, placeholder: "Escreva um comentário…" });
+
+  const close = () => { panel.remove(); removeEventListener("keydown", onKey, true); removeEventListener("pointerdown", onOutside, true); };
+  const onKey = (e) => { if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); close(); } };
+  const onOutside = (e) => { if (!panel.contains(e.target) && e.target !== anchor) close(); };
+
+  const persist = () => {
+    // sem comentários → limpa a chave para não inchar o documento
+    if (!block.props.comments.length) delete block.props.comments;
+    commit({ structural: true });
+  };
+
+  const paint = () => {
+    list.innerHTML = "";
+    const all = comments(block);
+    if (!all.length) {
+      list.appendChild(h("div", { class: "comment-empty" }, "Nenhum comentário ainda."));
+      return;
+    }
+    all.forEach((c) => {
+      const item = h("div", { class: "comment-item" + (c.resolved ? " resolved" : "") },
+        h("div", { class: "comment-text" }, c.text),
+        h("div", { class: "comment-foot" },
+          h("span", { class: "comment-time" }, fmtRelative(c.at)),
+          h("button", {
+            class: "comment-act", title: c.resolved ? "Reabrir" : "Marcar como resolvido",
+            onclick: () => { c.resolved = !c.resolved; persist(); paint(); },
+          }, c.resolved ? "↩ reabrir" : "✓ resolver"),
+          h("button", {
+            class: "comment-act danger", title: "Excluir comentário",
+            onclick: () => {
+              block.props.comments = block.props.comments.filter((x) => x.id !== c.id);
+              persist();
+              if (!comments(block).length) { close(); return; }
+              paint();
+            },
+          }, "excluir")));
+      list.appendChild(item);
+    });
+  };
+
+  const add = () => {
+    const text = input.value.trim();
+    if (!text) return;
+    block.props.comments.push({ id: uid("c"), text, at: Date.now(), resolved: false });
+    input.value = "";
+    persist();
+    paint();
+  };
+  input.addEventListener("keydown", (e) => {
+    e.stopPropagation(); // não deixa o editor interpretar as teclas
+    if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) { e.preventDefault(); add(); }
+    if (e.key === "Escape") { e.preventDefault(); close(); }
+  });
+
+  paint();
+  panel.append(
+    h("div", { class: "comment-head" }, h("span", {}, "💬 Comentários"),
+      h("button", { class: "icon-btn", "aria-label": "Fechar", onclick: close }, "✕")),
+    list,
+    h("div", { class: "comment-compose" }, input,
+      h("button", { class: "btn primary sm", onclick: add }, "Comentar")));
+
+  document.getElementById("overlay-root").appendChild(panel);
+  positionFloating(panel, anchor.getBoundingClientRect(), { gap: 8, align: "right" });
+  addEventListener("keydown", onKey, true);
+  setTimeout(() => addEventListener("pointerdown", onOutside, true), 0);
+  setTimeout(() => input.focus(), 30);
 }
 
 function placeholderFor(type) {
@@ -1916,6 +2015,11 @@ function blockMenu(e, block) {
       action: () => { block.type = d.type; commit({ structural: true }); },
     })),
     { sep: true },
+    { icon: "💬", title: comments(block).length ? `Comentários (${comments(block).length})` : "Comentar", action: () => {
+      const anchor = state.blocksEl.querySelector(`[data-block-id="${block.id}"] .comment-marker`)
+        || state.blocksEl.querySelector(`[data-block-id="${block.id}"]`);
+      commentPopover(anchor, block);
+    } },
     { icon: "↑", title: "Mover para cima", action: () => moveBlock(block, -1) },
     { icon: "↓", title: "Mover para baixo", action: () => moveBlock(block, +1) },
     { icon: "⧉", title: "Duplicar", kbd: "⌘D", action: () => {

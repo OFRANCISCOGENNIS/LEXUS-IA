@@ -342,3 +342,27 @@ tr:hover .row-menu-btn { opacity: 1; }
 }
 .row-expand:hover { background: var(--surface-active); color: var(--text-2); }
 .row-expand.empty { pointer-events: none; visibility: hidden; }
+
+/* ═══════════════ Propriedade Arquivo / Imagem ═══════════════ */
+.db-cell.cell-file { gap: 6px; cursor: pointer; }
+.file-thumb {
+  width: 28px; height: 28px; flex: none;
+  object-fit: cover; border-radius: var(--r-sm);
+  border: 1px solid var(--border); background: var(--surface-2);
+}
+.file-thumb.sm { width: 22px; height: 22px; }
+.file-chip {
+  font-size: var(--fs-xs); color: var(--text-2);
+  background: var(--surface-2); border: 1px solid var(--border);
+  border-radius: var(--r-sm); padding: 2px 7px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.file-x {
+  margin-left: auto; flex: none; width: 18px; height: 18px;
+  display: grid; place-items: center; border-radius: 4px;
+  color: var(--text-faint); font-size: 10px; opacity: 0;
+  transition: opacity var(--t-fast), color var(--t-fast), background var(--t-fast);
+}
+.db-cell.cell-file:hover .file-x { opacity: 1; }
+.file-x:hover { color: var(--danger); background: var(--danger-soft); }
+@media (hover: none) { .file-x { opacity: 1; } }

@@ -65,11 +65,13 @@ como raiz automaticamente — nunca "desaparece" da sidebar. Criar sub-página: 
 ＋ no hover do item na sidebar, menu "⋯" da página (sidebar e topbar do editor), ou
 comando contextual no command palette.
 Bloco: `{id, type, content(html), props{}, children[]}` — tipos: p h1-h4 bulleted numbered todo toggle quote callout code divider image.
+Comentários por bloco: `props.comments[] = {id, text, at, resolved}` — a chave é apagada quando o último comentário some, para não inchar o documento.
 
 Databases: `listDatabases()`, `getDatabase(id)`, `createDatabase(partial)`, `updateDatabase(id, patch)`,
 `touchDatabase(id)` (rows/props mutadas in-place), `deleteDatabase(id)`, `makeDatabase(partial)`, `makeRow(db, values)`.
 Database: `{id, name, icon, properties[], rows[], views[], automations[]}`.
-Property: `{id, name, type, options?, targetDbId?, relationPropId?, targetPropId?, agg?, formula?}` — types: `title text number select multiselect date checkbox url formula relation rollup`.
+Property: `{id, name, type, options?, targetDbId?, inversePropId?, relationPropId?, targetPropId?, agg?, formula?}` — types: `title text number select multiselect date checkbox url file formula relation rollup created updated`.
+`file` guarda `{name, type, size, src(dataURL)}` (limite 5MB, fica em IndexedDB). `relation` com `inversePropId` é bidirecional: a database alvo ganha a propriedade inversa e os dois lados são espelhados por `syncInverseRelation()` ao editar ou excluir linhas.
 `title` é a property fixa id="title". Select option: `{id, name, color}` (colors: gray blue green amber red purple).
 Row: `{id, values: {propId: valor}, parentId?, createdAt, updatedAt}` — select guarda option.id; multiselect/relation array de ids; date "YYYY-MM-DD"; checkbox bool. `parentId` aninha sub-itens (só a view de tabela expande/recolhe; excluir o pai remove os descendentes).
 View: `{id, name, type:"table"|"kanban"|"gallery"|"list"|"calendar"|"timeline", filters[], sorts[], groupBy, dateProp?, filterGroup?, startProp?, endProp?, depProp?}`.

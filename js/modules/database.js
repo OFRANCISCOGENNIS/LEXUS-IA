@@ -16,6 +16,7 @@ const PROP_TYPES = [
   { type: "date", icon: "📅", name: "Data" },
   { type: "checkbox", icon: "☑", name: "Checkbox" },
   { type: "url", icon: "🔗", name: "URL" },
+  { type: "file", icon: "📎", name: "Arquivo / Imagem" },
   { type: "formula", icon: "∑", name: "Fórmula" },
   { type: "relation", icon: "⇄", name: "Relação" },
   { type: "rollup", icon: "Σ", name: "Rollup" },
@@ -25,6 +26,8 @@ const PROP_TYPES = [
 /* propriedades calculadas — não têm valor em row.values e não são editáveis */
 const AUTO_PROPS = new Set(["created", "updated"]);
 const COMPUTED_PROPS = new Set(["formula", "rollup", "created", "updated"]);
+/* tipos cujo valor não é escalar → fora de filtros avançados e de automações */
+const NON_FILTERABLE = new Set(["relation", "file"]);
 const autoValue = (row, prop) => prop.type === "created" ? row.createdAt : row.updatedAt;
 const TYPE_ICON = Object.fromEntries(PROP_TYPES.map((t) => [t.type, t.icon]));
 TYPE_ICON.title = "T";
@@ -88,6 +91,7 @@ function exportCsv(db) {
   const lines = db.rows.map((r) => props.map((p) => {
     let v = r.values[p.id];
     if (AUTO_PROPS.has(p.type)) v = new Date(autoValue(r, p)).toLocaleString("pt-BR");
+    if (p.type === "file") v = v?.name || ""; // o binário não vai para o CSV
     if (p.type === "select") v = p.options?.find((o) => o.id === v)?.name || "";
     if (p.type === "multiselect") v = (v || []).map((id) => p.options?.find((o) => o.id === id)?.name).filter(Boolean).join("; ");
     if (p.type === "checkbox") v = v ? "sim" : "não";
@@ -274,7 +278,7 @@ function matchCondition(row, cond, db) {
 function advancedFilterModal() {
   const view = currentView();
   const fg = view.filterGroup || (view.filterGroup = { op: "and", conditions: [] });
-  const filterable = state.db.properties.filter((p) => !COMPUTED_PROPS.has(p.type) && p.type !== "relation");
+  const filterable = state.db.properties.filter((p) => !COMPUTED_PROPS.has(p.type) && !NON_FILTERABLE.has(p.type));
 
   const list = h("div", { class: "filter-conditions" });
   const paint = () => {
@@ -364,6 +368,7 @@ function visibleRows() {
       let v = r.values[p.id];
       if (p.type === "select") v = p.options?.find((o) => o.id === v)?.name;
       if (p.type === "multiselect") v = (v || []).map((id) => p.options?.find((o) => o.id === id)?.name).join(" ");
+      if (p.type === "file") v = v?.name; // busca pelo nome do arquivo, não pelo binário
       return String(v ?? "").toLowerCase().includes(q);
     }));
   }
@@ -421,6 +426,12 @@ function propBadge(row, p) {
   if (p.type === "checkbox") return v ? h("span", { class: "chip c-green" }, "✓ " + p.name) : null;
   if (p.type === "url") return h("a", { href: /^https?:/i.test(v) ? v : "https://" + v, target: "_blank", rel: "noopener", onclick: (e) => e.stopPropagation() }, String(v));
   if (p.type === "number") return h("span", { class: "chip" }, Number(v).toLocaleString("pt-BR"));
+  if (p.type === "file") {
+    if (!v?.src) return null;
+    return (v.type || "").startsWith("image/")
+      ? h("img", { class: "file-thumb sm", src: v.src, alt: v.name || "" })
+      : h("span", { class: "chip" }, "📎 " + (v.name || "arquivo").slice(0, 18));
+  }
   if (p.type === "relation") { const t = getDatabase(p.targetDbId); const n = (v || []).length; return n ? h("span", { class: "chip c-blue" }, `⇄ ${n}`) : null; }
   if (p.type === "rollup") { const rv = evalRollup(p, row, state.db); return rv && rv !== "—" ? h("span", { class: "chip" }, "Σ " + rv) : null; }
   return h("span", { style: "color:var(--text-3);font-size:var(--fs-xs)" }, String(v));
@@ -449,8 +460,34 @@ function renderGallery(root) {
   root.appendChild(newRowBtn());
 }
 function firstImage(row) {
-  for (const k in row.values) { const v = row.values[k]; if (typeof v === "string" && v.startsWith("data:image")) return v; }
+  for (const k in row.values) {
+    const v = row.values[k];
+    if (typeof v === "string" && v.startsWith("data:image")) return v;
+    // propriedade "Arquivo / Imagem": usa a imagem como capa do cartão
+    if (v && typeof v === "object" && typeof v.src === "string" && (v.type || "").startsWith("image/")) return v.src;
+  }
   return null;
+}
+
+/* Upload local de arquivo para uma célula (fica em IndexedDB como data URL) */
+const FILE_LIMIT = 5 * 1024 * 1024; // 5MB — acima disso o workspace incha demais
+function pickFileFor(row, prop, set, paint) {
+  const input = h("input", { type: "file", style: "display:none" });
+  input.addEventListener("change", () => {
+    const f = input.files?.[0];
+    input.remove();
+    if (!f) return;
+    if (f.size > FILE_LIMIT) {
+      toast(`Arquivo grande demais (máx. ${FILE_LIMIT / 1048576}MB para guardar localmente)`, { type: "warn" });
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => { set({ name: f.name, type: f.type, size: f.size, src: reader.result }); paint(); };
+    reader.onerror = () => toast("Falha ao ler o arquivo", { type: "danger" });
+    reader.readAsDataURL(f);
+  });
+  document.body.appendChild(input);
+  input.click();
 }
 
 /* ═══════════ LISTA ═══════════ */
@@ -809,6 +846,10 @@ function rowMenu(e, row) {
     } },
     { icon: "🗑", title: "Excluir linha" + (descendantsOf(row.id).length ? " e sub-itens" : ""), danger: true, action: () => {
       const kill = new Set([row.id, ...descendantsOf(row.id)]);
+      // limpa os dois lados das relações bidirecionais antes de remover
+      state.db.properties.filter((p) => p.type === "relation" && p.inversePropId).forEach((p) => {
+        state.db.rows.filter((r) => kill.has(r.id)).forEach((r) => syncInverseRelation(p, r, r.values[p.id] || [], []));
+      });
       state.db.rows = state.db.rows.filter((r) => !kill.has(r.id));
       commit(); renderView();
     } },
@@ -901,12 +942,71 @@ function configureRelation(prop) {
   const body = h("div", {});
   const dbs = listDatabases();
   if (!dbs.length) { toast("Nenhuma database para relacionar", { type: "warn" }); return; }
+
+  const twoWay = h("input", { type: "checkbox" });
+  twoWay.checked = !!prop.inversePropId;
+  body.appendChild(h("label", { class: "gcp-check", style: "margin-bottom:10px" }, twoWay,
+    h("span", {}, "Mostrar dos dois lados (a outra database ganha a relação inversa)")));
+
   dbs.forEach((d) => body.appendChild(h("button", {
     class: "btn " + (prop.targetDbId === d.id ? "primary" : "ghost"),
     style: "width:100%;justify-content:flex-start;margin-bottom:6px",
-    onclick: () => { prop.targetDbId = d.id; commit(); m.close(); renderView(); toast("Relação configurada"); },
+    onclick: () => {
+      prop.targetDbId = d.id;
+      if (twoWay.checked) ensureInverseProp(prop, d);
+      else if (prop.inversePropId) removeInverseProp(prop);
+      commit(); m.close(); renderView();
+      toast(twoWay.checked ? "Relação bidirecional configurada" : "Relação configurada");
+    },
   }, `${d.icon || "▦"} ${d.name}`)));
-  const m = showModal({ title: `Relacionar “${prop.name}” com…`, body, width: 420 });
+  const m = showModal({ title: `Relacionar “${prop.name}” com…`, body, width: 460 });
+}
+
+/* ── Relações bidirecionais ──
+   A relação inversa é uma propriedade "relation" na database alvo apontando de
+   volta; os dois lados são espelhados sempre que uma célula muda. */
+function ensureInverseProp(prop, targetDb) {
+  const existing = targetDb.properties.find((p) => p.id === prop.inversePropId);
+  if (existing) { existing.targetDbId = state.db.id; existing.inversePropId = prop.id; return existing; }
+  const inv = {
+    id: uid("pr"), type: "relation", name: state.db.name || "Relacionados",
+    targetDbId: state.db.id, inversePropId: prop.id,
+  };
+  targetDb.properties.push(inv);
+  prop.inversePropId = inv.id;
+  touchDatabase(targetDb.id);
+  return inv;
+}
+
+function removeInverseProp(prop) {
+  const target = prop.targetDbId ? getDatabase(prop.targetDbId) : null;
+  if (target && prop.inversePropId) {
+    target.properties = target.properties.filter((p) => p.id !== prop.inversePropId);
+    target.rows.forEach((r) => { delete r.values[prop.inversePropId]; });
+    touchDatabase(target.id);
+  }
+  delete prop.inversePropId;
+}
+
+/* Espelha na database alvo a mudança feita em uma célula de relação */
+function syncInverseRelation(prop, row, beforeIds, afterIds) {
+  if (!prop.inversePropId || !prop.targetDbId) return;
+  const target = getDatabase(prop.targetDbId);
+  if (!target) return;
+  const before = new Set(beforeIds || []);
+  const after = new Set(afterIds || []);
+  let changed = false;
+  target.rows.forEach((tr) => {
+    const has = after.has(tr.id);
+    const had = before.has(tr.id);
+    if (has === had) return;
+    const cur = new Set(tr.values[prop.inversePropId] || []);
+    has ? cur.add(row.id) : cur.delete(row.id);
+    tr.values[prop.inversePropId] = [...cur];
+    tr.updatedAt = Date.now();
+    changed = true;
+  });
+  if (changed) touchDatabase(target.id);
 }
 
 /* ── Configuração de Rollup ── */
@@ -1042,6 +1142,25 @@ function renderCell(row, prop, isFirst) {
       paint();
       return cell;
     }
+    case "file": {
+      const cell = h("div", { class: cls + " cell-file" });
+      const paint = () => {
+        cell.innerHTML = "";
+        const f = row.values[prop.id];
+        if (!f) { cell.appendChild(h("span", { class: "cell-empty" }, "＋ arquivo")); return; }
+        const isImg = (f.type || "").startsWith("image/");
+        cell.appendChild(isImg
+          ? h("img", { class: "file-thumb", src: f.src, alt: f.name || "", title: f.name || "" })
+          : h("span", { class: "file-chip", title: f.name || "" }, "📎 " + (f.name || "arquivo").slice(0, 22)));
+        cell.appendChild(h("button", {
+          class: "file-x", title: "Remover arquivo",
+          onclick: (e) => { e.stopPropagation(); set(null); paint(); },
+        }, "✕"));
+      };
+      cell.onclick = () => pickFileFor(row, prop, set, paint);
+      paint();
+      return cell;
+    }
     case "formula": {
       const val = evalFormula(prop, row, state.db);
       const cell = h("div", { class: cls + " cell-formula", title: "Fórmula (somente leitura) — edite no menu da coluna" });
@@ -1095,10 +1214,12 @@ function relationMenu(anchor, prop, row, repaint) {
     icon: ids().includes(r.id) ? "✓" : " ",
     title: r.values.title || "Sem nome",
     action: () => {
-      const cur = new Set(ids());
+      const before = ids();
+      const cur = new Set(before);
       cur.has(r.id) ? cur.delete(r.id) : cur.add(r.id);
       row.values[prop.id] = [...cur];
       row.updatedAt = Date.now();
+      syncInverseRelation(prop, row, before, row.values[prop.id]);
       commit(); repaint();
     },
   }));
@@ -1725,7 +1846,7 @@ function autoValueControl(prop, current, { includeAny = false } = {}) {
 
 function automationEditor(existing) {
   const db = state.db;
-  const editable = db.properties.filter((p) => !COMPUTED_PROPS.has(p.type) && p.type !== "relation");
+  const editable = db.properties.filter((p) => !COMPUTED_PROPS.has(p.type) && !NON_FILTERABLE.has(p.type));
   const draft = existing
     ? JSON.parse(JSON.stringify(existing))
     : { id: uid("au"), name: "", enabled: true, trigger: { type: "propChanged", propId: editable.find((p) => p.type === "select")?.id || editable[0]?.id, toValue: "" }, actions: [] };
