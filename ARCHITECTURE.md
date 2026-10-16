@@ -14,6 +14,7 @@ css/
   components.css      .btn .icon-btn .input .menu .modal .palette .chip .card .empty-state .switch .spinner — NÃO editar
   editor.css          editor de blocos — NÃO editar
   database.css        views de database
+  time.css            módulo Tempo (planejador, timeline, cronômetro, metas, revisão)
   assistant.css       assistente IA
   views.css           home/daily/settings/templates/trash/search/graph
 js/
@@ -27,6 +28,7 @@ js/
     ui.js             toast(msg,{type}), showMenu(anchor, items, opts), closeMenus(), showModal({title,body,footer,width})→{close,body}, confirmDialog({...})→Promise<bool>, promptDialog({...})→Promise<string|null>, emojiPicker(anchor, onPick)
     utils.js          h(tag,attrs,...children), uid, debounce, throttle, clamp, escapeHtml, stripHtml, sanitizeInline, fuzzyScore, highlightMatch, todayKey, fmtDate, fmtRelative, flip(container,mutate), positionFloating, isMac, modKey, download, countWords, readingTime
     markdown.js       pageToMarkdown(page), pageToHtml(page) — HTML autocontido, sem rede —, blocksToMarkdown(blocks), markdownToBlocks(md)
+    timetrack.js      cronômetro/sessões (ver abaixo) — vive fora da tela para contar durante a navegação
   modules/            um módulo por rota — default export { mount(container, params), unmount() }
   ai/                 engine WebLLM + worker
 ```
@@ -34,8 +36,11 @@ js/
 ## Rotas (hash)
 
 `#/home` `#/page/:id` `#/db/:id` `#/daily` `#/graph` `#/assistant` `#/settings`
-`#/templates` `#/trash` `#/search/:query?` — registradas em `app.js` com import lazy.
+`#/templates` `#/trash` `#/search/:query?` `#/time/:tab?` — registradas em `app.js` com import lazy.
 `params.id` chega ao `mount(container, params)` já decodificado.
+Em `#/time` o `params.id` é a aba (`plan` · `timeline` · `track` · `goals` · `review`);
+sem aba, abre a última usada (setting `timeTab`) e o módulo corrige a URL com
+`history.replaceState` — trocar de aba não empilha histórico.
 
 ## Contrato de módulo de rota
 
@@ -85,6 +90,38 @@ Fórmulas: além de números/lógica, funções de data (`hoje`, `dias`, `somarD
 texto (`concat`, `maiusc`, `minusc`, `tamanho`, `contem`, `substituir`, `vazio`). A validação mascara as
 strings antes de checar identificadores, então acentos e vírgulas no texto não derrubam a fórmula.
 Lixeira: `listTrash()`, `restoreFromTrash(trashId)`, `purgeTrash(trashId?)`.
+
+## Módulo Tempo (js/modules/time.js + js/core/timetrack.js)
+
+Nada de store novo: tudo vive em settings, então a sincronização opcional já cobre.
+
+- `timeBlocks` — `{ "YYYY-MM-DD": [ {id, start:"HH:MM", end, title, color, ref?, done, routineId?, cancelled?} ] }`.
+  Dias vazios são removidos na escrita. `ref` liga o bloco a uma tarefa:
+  `{kind:"row", dbId, rowId, title}` ou `{kind:"block", pageId, blockId, title}` —
+  concluir o bloco marca a tarefa de origem.
+- `timeRoutines` — `[{id, weekday(0=segunda), start, end, title, color}]`. Rotinas são
+  desenhadas como blocos "fantasma" nas semanas seguintes; arrastar, concluir ou editar
+  um fantasma o **materializa** (vira bloco concreto com o mesmo `routineId`).
+  "Remover só deste dia" grava um bloco `cancelled: true` — a exceção que impede o
+  fantasma de voltar sem apagar a rotina.
+- `timeSessions` — `[{id, label, ref?, start, end, seconds, date, manual?}]`, teto de 3000.
+- `timeActive` — cronômetro em curso `{id, label, ref, startedAt}`. Guarda o **instante
+  de início**, nunca um contador: o tempo é sempre recalculado do relógio, então
+  recarregar a página não perde nem infla a sessão. Marcado como *ephemeral* no sync
+  (um cronômetro correndo é estado do dispositivo, não do workspace).
+- `timeGoals` — `[{id, title, icon, period, metric:"manual"|"hours"|"krs", target, unit, match, progress, krs:[{id,title,done}], color, archived}]`.
+  `period` é `"YYYY"`, `"YYYY-MM"` ou `"YYYY-Qn"`; `periodRange()` converte em `[de, até]`.
+- `timePlanRange` `{from, to}` (horas visíveis na grade) · `timeTlDays` (14/30/90) · `timeTab`.
+
+API de `core/timetrack.js`: `activeTimer()`, `elapsedOf(t?)`, `startTimer({label, ref})`,
+`stopTimer()` (descarta sessões < 5 s), `toggleTimer(opts)`, `listSessions()`,
+`addSession({label,date,minutes})`, `removeSession(id)`, `sessionsBetween(de, até)`,
+`totalSeconds(list)`, `byLabel(list)`, `fmtDur(seg)`, `fmtClock(seg)`.
+
+Arrasto na grade: durante o gesto o bloco **não troca de pai no DOM** — recebe só um
+`transform`. Reparentar no meio do arrasto fazia o navegador soltar o pointer capture e
+o gesto morria calado ao cruzar mais de uma coluna. Blocos que se sobrepõem dividem a
+largura da coluna (`overlapLayout()`), como num calendário.
 Settings: `getSetting(key, fallback)`, `setSetting(key, value)`.
 Busca/links: `searchAll(query,{limit})→[{kind,id,rowId?,title,icon,snippet,score,updatedAt}]`,
 `pageText(p)`, `pageWordCount(p)`, `backlinksTo(pageId)`, `unlinkedMentions(pageId)`, `knowledgeGraph()→{nodes:[{id,title,icon,links}], edges:[{from,to}]}`.
@@ -94,6 +131,8 @@ Stats/backup: `workspaceStats()`, `exportWorkspace()→objeto`, `importWorkspace
 
 - `pages:changed` `{type, id}` · `dbs:changed` `{type, id}` · `settings:changed` `{key, value}` · `route:changed` `{name, params}`
 - `palette:open` · `capture:open` · `shortcuts:open` — sem payload
+- `timer:changed` `{type:"start"|"stop"|"sessions", timer?, session?}` — cronômetro; o selo
+  da topbar (shell.js) e as abas Cronômetro/Revisão ouvem para repintar
 - `ai:selection` `{text, pageId, rect, apply(novoTexto)}` — editor emite ao clicar "✳ IA" na barra de seleção; o assistente deve ouvir e abrir popover de ações
 - `ai:page` `{pageId}` — botão "✳ IA" do topbar da página
 - `ai:status` `{status, modelId, progress}` — engine emite mudanças de estado

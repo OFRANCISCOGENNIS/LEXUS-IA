@@ -205,7 +205,7 @@ function startAuto() {
   const schedulePush = () => { clearTimeout(pushTimer); pushTimer = setTimeout(() => pushNow().catch(() => {}), 4000); };
   autoOffs.push(bus.on("pages:changed", schedulePush));
   autoOffs.push(bus.on("dbs:changed", schedulePush));
-  const EPHEMERAL_KEYS = new Set(["recentPages", "sidebarExpanded"]);
+  const EPHEMERAL_KEYS = new Set(["recentPages", "sidebarExpanded", "timeActive"]);
   autoOffs.push(bus.on("settings:changed", ({ key }) => { if (!key.startsWith("supabase") && !EPHEMERAL_KEYS.has(key)) schedulePush(); }));
 }
 

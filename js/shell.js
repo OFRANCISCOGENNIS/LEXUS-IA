@@ -10,6 +10,7 @@ import {
 import { h, isMac, debounce } from "./core/utils.js";
 import { showMenu, toast, emojiPicker, promptDialog, confirmDialog } from "./core/ui.js";
 import * as sync from "./core/sync.js";
+import * as tracker from "./core/timetrack.js";
 
 /* ── Tema / aparência ── */
 export function applyAppearance() {
@@ -391,6 +392,33 @@ export function initShell() {
   bus.on("sync:status", paintSyncBadge);
   paintSyncBadge();
 
+  // ── Cronômetro: o selo na topbar mostra que há uma sessão correndo,
+  // em qualquer tela, e leva direto para o relatório. ──
+  const pillEl = document.getElementById("tracker-pill");
+  let pillTick = null;
+  const paintTracker = () => {
+    if (!pillEl) return;
+    const t = tracker.activeTimer();
+    clearInterval(pillTick); pillTick = null;
+    pillEl.hidden = !t;
+    const navBadge = document.getElementById("nav-time-badge");
+    if (navBadge) navBadge.hidden = !t;
+    if (!t) return;
+    const paint = () => {
+      pillEl.innerHTML = "";
+      pillEl.append(
+        h("span", { class: "tp-dot" }),
+        h("span", { class: "tp-text" }, tracker.fmtClock(tracker.elapsedOf(t))),
+        h("span", { class: "tp-label" }, " · " + t.label)
+      );
+    };
+    paint();
+    pillTick = setInterval(paint, 1000);
+  };
+  pillEl?.addEventListener("click", () => navigate("time", "track"));
+  bus.on("timer:changed", paintTracker);
+  paintTracker();
+
   // re-render reativo
   bus.on("pages:changed", () => { renderSidebar(); renderBreadcrumb(); });
   bus.on("dbs:changed", () => { renderSidebar(); renderBreadcrumb(); });
@@ -421,6 +449,13 @@ export function initShell() {
     else if (e.altKey && e.key === "ArrowRight") { e.preventDefault(); history.forward(); }
     else if (e.altKey && e.key === "Home") { e.preventDefault(); navigate("home"); }
     else if (e.altKey && !inInput && /^[1-9]$/.test(e.key)) { e.preventDefault(); jumpToSection(+e.key); }
+    else if (e.altKey && k === "t") {                                                        // Alt+T cronômetro
+      e.preventDefault();
+      const was = tracker.activeTimer();
+      const s = tracker.toggleTimer({ label: "Foco" });
+      toast(was ? (s ? `Registrado: ${tracker.fmtDur(s.seconds)}` : "Sessão curta descartada") : "Cronômetro iniciado ⏱",
+        { duration: 1600, type: was && !s ? "warn" : "ok" });
+    }
     // ── Teclas de função ──
     else if (e.key === "F1") { e.preventDefault(); bus.emit("shortcuts:open", {}); }
     else if (e.key === "F2" && !inInput) { e.preventDefault(); renameCurrent(); }
@@ -432,7 +467,7 @@ export function initShell() {
 }
 
 /* Alt+1..9 → salta para as seções principais (como Ctrl+1..9 nas abas do Windows) */
-const SECTIONS = ["home", "tasks", "calendar", "productivity", "tags", "graph", "templates", "settings", "trash"];
+const SECTIONS = ["home", "tasks", "calendar", "time", "productivity", "tags", "graph", "templates", "settings"];
 function jumpToSection(n) {
   const route = SECTIONS[n - 1];
   if (route) navigate(route);

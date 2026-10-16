@@ -9,6 +9,7 @@ import {
 import { h, fuzzyScore, highlightMatch, escapeHtml, modKey } from "../core/utils.js";
 import { toast, showModal } from "../core/ui.js";
 import { newPage, newDatabase, setTheme, toggleTheme } from "../shell.js";
+import * as tracker from "../core/timetrack.js";
 
 let paletteEl = null;
 
@@ -29,6 +30,11 @@ function commands() {
     { icon: "☀", title: "Abrir nota de hoje", kind: "Ação", run: () => { getOrCreateDaily(); navigate("daily"); } },
     { icon: "✓", title: "Abrir Tarefas & Projetos", kind: "Navegar", run: () => navigate("tasks") },
     { icon: "📅", title: "Abrir Calendário", kind: "Navegar", run: () => navigate("calendar") },
+    { icon: "🗓", title: "Abrir Tempo · Planejador da semana", kind: "Navegar", run: () => navigate("time", "plan") },
+    { icon: "▤", title: "Abrir Tempo · Timeline global", kind: "Navegar", run: () => navigate("time", "timeline") },
+    { icon: "⏱", title: "Iniciar / parar cronômetro", kind: "Ação", kbd: "Alt T", run: () => toggleTracker() },
+    { icon: "◎", title: "Metas & OKRs", kind: "Navegar", run: () => navigate("time", "goals") },
+    { icon: "✓", title: "Revisão da semana", kind: "Navegar", run: () => navigate("time", "review") },
     { icon: "◷", title: "Abrir Produtividade (Pomodoro, Hábitos, Lembretes)", kind: "Navegar", run: () => navigate("productivity") },
     { icon: "🏷", title: "Abrir Tags & Coleções", kind: "Navegar", run: () => navigate("tags") },
     { icon: "☁", title: "Sincronizar entre dispositivos", kind: "Ação", run: () => navigate("settings") },
@@ -44,6 +50,14 @@ function commands() {
     { icon: "⌨", title: "Atalhos de teclado", kind: "Ajuda", kbd: "?", run: () => showShortcuts() },
   );
   return list;
+}
+
+/* Alterna o cronômetro de qualquer lugar (também em Alt+T) */
+function toggleTracker() {
+  const was = tracker.activeTimer();
+  const s = tracker.toggleTimer({ label: "Foco" });
+  if (was) toast(s ? `Registrado: ${tracker.fmtDur(s.seconds)} em “${s.label}”` : "Sessão curta descartada", { type: s ? "ok" : "warn" });
+  else { toast("Cronômetro iniciado ⏱"); navigate("time", "track"); }
 }
 
 export function initPalette() {
@@ -245,6 +259,7 @@ function showShortcuts() {
       ["Avançar", "Alt →"],
       ["Início (dashboard)", "Alt Home"],
       ["Ir para seção 1–9", "Alt 1…9"],
+      ["Iniciar / parar cronômetro", "Alt T"],
       ["Renomear página/database", "F2"],
     ]],
     ["Editor de blocos", [

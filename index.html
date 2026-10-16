@@ -20,6 +20,7 @@
   <link rel="stylesheet" href="css/database.css" />
   <link rel="stylesheet" href="css/views.css" />
   <link rel="stylesheet" href="css/productivity.css" />
+  <link rel="stylesheet" href="css/time.css" />
   <link rel="stylesheet" href="css/polish.css" />
   <link rel="stylesheet" href="css/redesign.css" />
   <link rel="stylesheet" href="css/mobile.css" />
@@ -60,6 +61,10 @@
         </button>
         <button class="sidebar-item" data-nav="calendar">
           <span class="si-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3.5" y="5" width="17" height="16" rx="3"/><path d="M3.5 10h17M8 2.5V6M16 2.5V6"/></svg></span><span class="si-label">Calendário</span>
+        </button>
+        <button class="sidebar-item" data-nav="time">
+          <span class="si-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg></span><span class="si-label">Tempo</span>
+          <span class="si-badge" id="nav-time-badge" hidden>⏱</span>
         </button>
         <button class="sidebar-item" data-nav="productivity">
           <span class="si-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 20V10M10 20V4M16 20v-8M22 20H2"/></svg></span><span class="si-label">Produtividade</span>
@@ -134,6 +139,9 @@
         <div class="topbar-global">
           <button class="capture-cta" data-action="quick-capture" title="Captura rápida (⌘⇧N)">
             ＋ Captura rápida <kbd>⌘⇧N</kbd>
+          </button>
+          <button type="button" id="tracker-pill" class="tracker-pill" hidden title="Cronômetro em andamento — abrir">
+            <span class="tp-dot"></span><span class="tp-text">00:00</span>
           </button>
           <button id="theme-toggle" class="theme-toggle" title="Alternar tema (⌘⇧L)" aria-label="Alternar tema">🌙</button>
           <span class="topbar-avatar" id="topbar-avatar" title="NEXUS · workspace local">N</span>

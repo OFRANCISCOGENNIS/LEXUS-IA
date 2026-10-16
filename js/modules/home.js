@@ -9,6 +9,7 @@ import { h, fmtRelative, stripHtml, todayKey } from "../core/utils.js";
 import { isUnlocked } from "../core/privacy.js";
 import { newPage, newDatabase } from "../shell.js";
 import { collectTasks } from "./tasks.js";
+import * as tracker from "../core/timetrack.js";
 import { toast } from "../core/ui.js";
 
 /* ── Registro de widgets ───────────────────────────────────────────────
@@ -17,6 +18,7 @@ import { toast } from "../core/ui.js";
 const WIDGETS = [
   { id: "quick",     title: "Ações rápidas",  render: wQuick },
   { id: "tasks",     title: "Para hoje",      render: wTasks },
+  { id: "agenda",    title: "Agenda de hoje",  render: wAgenda },
   { id: "recents",   title: "Recentes",       render: wRecents },
   { id: "databases", title: "Databases",      render: wDatabases },
   { id: "activity",  title: "Atividade",      render: wActivity },
@@ -151,6 +153,40 @@ function wTasks() {
   const rest = (due.length ? due : all).length - list.length;
   card.appendChild(h("button", { class: "home-task-more", onclick: () => navigate("tasks") },
     rest > 0 ? `ver todas (+${rest}) →` : "ver todas →"));
+  return card;
+}
+
+/* Agenda de hoje: blocos planejados no módulo Tempo + cronômetro em curso */
+function wAgenda() {
+  const today = todayKey();
+  const blocks = (getSetting("timeBlocks", {}) || {})[today] || [];
+  const routines = (getSetting("timeRoutines", []) || [])
+    .filter((r) => r.weekday === (new Date(today + "T12:00:00").getDay() + 6) % 7)
+    .filter((r) => !blocks.some((b) => b.routineId === r.id))
+    .map((r) => ({ ...r, ghost: true }));
+  const list = [...blocks.filter((b) => !b.cancelled), ...routines]
+    .sort((a, b) => String(a.start).localeCompare(String(b.start)));
+  const active = tracker.activeTimer();
+  if (!list.length && !active) return null;
+
+  const card = h("div", { class: "card home-agenda" });
+  if (active) {
+    card.appendChild(h("button", { class: "home-agenda-row running", onclick: () => navigate("time", "track") },
+      h("span", { class: "ha-time" }, "⏱"),
+      h("span", { class: "ha-title" }, active.label),
+      h("span", { class: "ha-meta" }, tracker.fmtClock(tracker.elapsedOf(active)))));
+  }
+  list.slice(0, 6).forEach((b) => {
+    card.appendChild(h("button", {
+      class: "home-agenda-row" + (b.done ? " done" : "") + (b.ghost ? " ghost" : ""),
+      onclick: () => navigate("time", "plan"),
+    },
+      h("span", { class: "ha-time" }, b.start),
+      h("span", { class: "ha-title" }, (b.done ? "✓ " : "") + (b.title || "Bloco")),
+      h("span", { class: "ha-meta" }, b.ghost ? "↻" : "")));
+  });
+  card.appendChild(h("button", { class: "home-task-more", onclick: () => navigate("time", "plan") },
+    list.length > 6 ? `ver a semana (+${list.length - 6}) →` : "ver a semana →"));
   return card;
 }
 

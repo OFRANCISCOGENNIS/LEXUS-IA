@@ -138,11 +138,14 @@ export function positionFloating(el, anchorRect, { gap = 6, align = "left" } = {
   const vw = innerWidth, vh = innerHeight;
   el.style.visibility = "hidden";
   el.style.display = "block";
-  const r = el.getBoundingClientRect();
+  // offsetWidth/Height (tamanho de layout) em vez de getBoundingClientRect:
+  // o menu entra com uma animação de escala, e medir no meio dela devolvia um
+  // tamanho menor — o clamp "caberia" e o menu vazava da borda da tela.
+  const r = { width: el.offsetWidth, height: el.offsetHeight };
   let top = anchorRect.bottom + gap;
   let left = align === "left" ? anchorRect.left : anchorRect.right - r.width;
   if (top + r.height > vh - 8) top = Math.max(8, anchorRect.top - r.height - gap);
-  left = clamp(left, 8, vw - r.width - 8);
+  left = clamp(left, 8, Math.max(8, vw - r.width - 8));
   el.style.top = `${top}px`;
   el.style.left = `${left}px`;
   el.style.visibility = "";
