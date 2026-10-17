@@ -5,10 +5,12 @@ import {
 } from "../core/store.js";
 import { estimateStorage } from "../core/db.js";
 import { h, download, todayKey } from "../core/utils.js";
-import { toast, confirmDialog, promptDialog } from "../core/ui.js";
+import { toast, confirmDialog, promptDialog, showMenu } from "../core/ui.js";
+import { navigate } from "../core/router.js";
 import { setTheme } from "../shell.js";
 import { pageToMarkdown } from "../core/markdown.js";
 import * as sync from "../core/sync.js";
+import * as ai from "../core/ai.js";
 import { bus } from "../core/bus.js";
 
 const ACCENTS = [
@@ -60,6 +62,9 @@ export default {
       getSetting("pagewidth", "normal"), (v) => setSetting("pagewidth", v))));
 
     wrap.appendChild(ap);
+
+    /* ── Assistente de IA (gateway local) ── */
+    wrap.appendChild(renderAiSection());
 
     /* ── Dados ── */
     const data = section("Dados & backup");
@@ -119,7 +124,7 @@ export default {
     const priv = section("Privacidade");
     priv.appendChild(h("div", { class: "local-badge", style: "margin:0" },
       h("span", { class: "badge-dot" }),
-      "100% local · seus dados vivem apenas neste dispositivo, em IndexedDB. A IA roda no navegador via WebGPU — nenhum byte é enviado para servidores."));
+      "100% local por padrão · suas páginas e databases vivem só neste dispositivo, em IndexedDB. Nada sai daqui sem você ligar — e são só dois caminhos, ambos opcionais: a sincronização (cifrada no aparelho antes de subir) e o assistente de IA (fala com um gateway que roda na sua máquina)."));
     wrap.appendChild(priv);
 
     /* ── Zona de perigo ── */
@@ -252,6 +257,85 @@ function buildSyncBody() {
   const syncNow = h("button", { class: "btn", onclick: async () => { try { await sync.pullNow(); await sync.pushNow(); toast("Sincronizado ✓"); } catch (e) { toast(e.message, { type: "danger" }); } } }, "⟳ Sincronizar agora");
   const out = h("button", { class: "btn ghost", onclick: async () => { await sync.signOut(); toast("Sessão encerrada"); bus.emit("sync:status", sync.syncState()); } }, "Sair");
   box.append(h("div", { class: "btn-row" }, syncNow, out));
+  return box;
+}
+
+/* ═══════════ Assistente de IA (gateway OmniRoute local) ═══════════ */
+function renderAiSection() {
+  const sec = section("Assistente de IA (opcional)");
+  sec.dataset.section = "ai";
+  const body = h("div", {});
+  sec.appendChild(body);
+  const paint = () => { body.innerHTML = ""; body.appendChild(buildAiBody(paint)); };
+  paint();
+  return sec;
+}
+
+function buildAiBody(repaint) {
+  const c = ai.aiConfig();
+  const box = h("div", {});
+
+  const sw = h("button", {
+    class: "switch" + (c.enabled ? " on" : ""),
+    role: "switch", "aria-checked": String(c.enabled),
+    "aria-label": c.enabled ? "Desligar o assistente" : "Ligar o assistente",
+  });
+  sw.onclick = () => { ai.setAiConfig({ enabled: !c.enabled }); repaint(); };
+  box.appendChild(rowEl("Ligar o assistente", sw));
+  box.appendChild(h("p", { class: "settings-hint", style: "margin:-2px 0 14px" },
+    c.enabled
+      ? "Ligado: o texto que você enviar ao assistente sai deste aparelho rumo ao seu gateway e, de lá, ao provedor configurado lá dentro. Com um modelo local (Ollama, LM Studio) no OmniRoute, nada sai do computador."
+      : "Desligado, o NEXUS não faz nenhuma chamada de IA. Ligue só quando quiser — e aponte para um gateway que VOCÊ roda."));
+
+  const url = h("input", { class: "input", value: c.baseUrl, placeholder: "http://localhost:20128/v1", spellcheck: "false" });
+  url.addEventListener("change", () => ai.setAiConfig({ baseUrl: url.value.trim() }));
+  box.appendChild(rowEl("URL do gateway", url));
+
+  const key = h("input", { class: "input", type: "password", value: c.apiKey, placeholder: "chave gerada no painel do OmniRoute", spellcheck: "false" });
+  key.addEventListener("change", () => ai.setAiConfig({ apiKey: key.value.trim() }));
+  box.appendChild(rowEl("Chave do gateway", key));
+
+  const model = h("input", { class: "input", value: c.model, placeholder: "auto", spellcheck: "false" });
+  model.addEventListener("change", () => ai.setAiConfig({ model: model.value.trim() || "auto" }));
+  const pick = h("button", { class: "btn ghost sm", title: "Listar os modelos que o gateway oferece" }, "⌄ Modelos");
+  pick.onclick = async (e) => {
+    const anchor = e.currentTarget;           // guardado: some depois do await
+    pick.disabled = true; pick.textContent = "Carregando…";
+    const r = await ai.ping();
+    pick.disabled = false; pick.textContent = "⌄ Modelos";
+    if (!r.ok) { toast(r.error, { type: "danger", duration: 6000 }); return; }
+    const items = ["auto", ...r.models].slice(0, 60).map((id) => ({
+      icon: "✳", title: id,
+      action: () => { model.value = id; ai.setAiConfig({ model: id }); toast(`Modelo: ${id}`); },
+    }));
+    showMenu(anchor, items.length ? items : [{ icon: "⚠", title: "O gateway não listou modelos" }], { align: "right" });
+  };
+  box.appendChild(rowEl("Modelo", h("div", { class: "btn-row" }, model, pick)));
+
+  const status = h("span", { class: "settings-hint" }, "");
+  const test = h("button", { class: "btn" }, "Testar conexão");
+  test.onclick = async () => {
+    test.disabled = true;
+    status.className = "settings-hint";
+    status.textContent = "Chamando o gateway…";
+    const r = await ai.ping();
+    test.disabled = false;
+    if (r.ok) {
+      status.className = "settings-hint ai-ok";
+      status.textContent = `✓ Conectado — ${r.models.length} modelo(s) disponíveis.`;
+    } else {
+      status.className = "settings-hint ai-err";
+      status.textContent = "⚠ " + r.error;
+    }
+  };
+  box.appendChild(rowEl("Conexão", h("div", { class: "btn-row" }, test,
+    h("button", { class: "btn ghost", onclick: () => navigate("assistant") }, "Abrir assistente"))));
+  box.appendChild(h("div", { style: "margin-top:4px" }, status));
+
+  box.appendChild(h("p", { class: "settings-hint", style: "margin-top:12px" },
+    "O gateway é o ", h("a", { href: "https://github.com/diegosouzapw/OmniRoute", target: "_blank", rel: "noopener noreferrer" }, "OmniRoute"),
+    " (MIT): rode `npm install -g omniroute && omniroute`, conecte um provedor no painel em localhost:20128 e cole aqui a chave. Ele fala o protocolo da OpenAI, então qualquer gateway compatível também serve."));
+
   return box;
 }
 

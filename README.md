@@ -20,6 +20,7 @@ O NEXUS é um workspace de produtividade estilo Notion/Craft/Capacities,
 | 🏷 **Tags & Coleções** | Tags por página, páginas de tag automáticas e coleções inteligentes — inclusive **coleções próprias** (texto, tag, favoritas, período) |
 | ▤ **Templates** | 62 modelos prontos + **salvar qualquer página como template** |
 | 🔐 **Privacidade** | Páginas privadas com PIN local, bloqueio somente-leitura, lixeira e arquivo |
+| ✳ **Assistente de IA** (opcional, desligado) | Conversa, resume página, continua o texto e gera tarefas — falando com um gateway que **você** roda na sua máquina ([OmniRoute](https://github.com/diegosouzapw/OmniRoute), MIT): 374 provedores, 150+ camadas gratuitas, ou um modelo local (Ollama/LM Studio) e aí nada sai do computador. Sem API key embutida no app, sem backend nosso |
 | ☁ **Sincronização entre dispositivos** (opcional) | Login por e-mail/senha, dados cifrados no dispositivo (AES-256) antes de subir a um projeto Supabase seu — o servidor só guarda texto cifrado. Selo na sidebar mostra o status e leva direto à configuração (~5 min, grátis) |
 | 📱 **PWA + Mobile** | Instalável, offline após primeira carga, sidebar em drawer no celular |
 | ⎙ **Export** | Markdown, **HTML autocontido**, CSV, JSON e **PDF** (impressão limpa) |
@@ -48,5 +49,8 @@ Detalhes de arquitetura e contratos internos em [ARCHITECTURE.md](ARCHITECTURE.m
 
 ## 🔒 Privacidade
 
-- Nenhum `fetch` para serviços de terceiros — é uma restrição de arquitetura, não uma promessa.
-- Todos os dados vivem em IndexedDB local, exportáveis a qualquer momento.
+- **Local por padrão.** Sem conta, sem servidor nosso, sem telemetria: fechou o app, os dados continuam só no seu aparelho (IndexedDB), exportáveis a qualquer momento.
+- Existem exatamente **dois caminhos de saída, ambos opcionais e desligados de fábrica**:
+  1. **Sincronização** — cifra tudo neste dispositivo (AES-256) antes de subir para um projeto Supabase seu; o servidor só vê texto cifrado.
+  2. **Assistente de IA** — só o texto que você mandar, e só para o gateway que você apontar. Com um modelo local atrás do gateway, nada sai do computador.
+- Nenhuma chave de API vive no código do NEXUS: quem guarda credencial de provedor é o seu gateway.

@@ -39,6 +39,11 @@ function commands() {
     { icon: "🏷", title: "Abrir Tags & Coleções", kind: "Navegar", run: () => navigate("tags") },
     { icon: "☁", title: "Sincronizar entre dispositivos", kind: "Ação", run: () => navigate("settings") },
     { icon: "🍅", title: "Iniciar Pomodoro", kind: "Ação", run: () => navigate("productivity") },
+    { icon: "✳", title: "Abrir assistente de IA", kind: "Navegar", run: () => navigate("assistant") },
+    { icon: "✳", title: "Perguntar ao assistente sobre esta página", kind: "Ação", run: () => {
+      const r = parseHash();
+      r.name === "page" && r.params.id ? navigate("assistant", r.params.id) : navigate("assistant");
+    } },
     { icon: "◉", title: "Ver grafo de conhecimento", kind: "Navegar", run: () => navigate("graph") },
     { icon: "▤", title: "Galeria de templates", kind: "Navegar", run: () => navigate("templates") },
     { icon: "⚙", title: "Configurações", kind: "Navegar", run: () => navigate("settings") },

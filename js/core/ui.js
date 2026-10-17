@@ -70,7 +70,13 @@ export function showMenu(anchor, items, { align = "left", width } = {}) {
   };
 
   overlayRoot().appendChild(menu);
-  const rect = anchor instanceof DOMRect ? anchor : anchor.getBoundingClientRect();
+  // Em handlers async, `e.currentTarget` já é null quando o menu abre — sem esta
+  // rede o positionFloating quebrava e o menu ficava ancorado em (0,0), fora da
+  // tela. Sem âncora válida, abre no centro.
+  const rect = anchor instanceof DOMRect
+    ? anchor
+    : (anchor?.isConnected ? anchor.getBoundingClientRect()
+                           : new DOMRect(innerWidth / 2 - 110, innerHeight / 2 - 80, 0, 0));
   positionFloating(menu, rect, { align });
   requestAnimationFrame(() => {
     addEventListener("pointerdown", onOutside, true);

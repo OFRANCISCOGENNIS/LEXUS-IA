@@ -11,6 +11,7 @@ import { h, isMac, debounce } from "./core/utils.js";
 import { showMenu, toast, emojiPicker, promptDialog, confirmDialog } from "./core/ui.js";
 import * as sync from "./core/sync.js";
 import * as tracker from "./core/timetrack.js";
+import * as ai from "./core/ai.js";
 
 /* ── Tema / aparência ── */
 export function applyAppearance() {
@@ -418,6 +419,18 @@ export function initShell() {
   pillEl?.addEventListener("click", () => navigate("time", "track"));
   bus.on("timer:changed", paintTracker);
   paintTracker();
+
+  // ── Assistente: o selo na navegação só acende quando VOCÊ liga ──
+  const paintAi = () => {
+    const b = document.getElementById("nav-ai-badge");
+    if (!b) return;
+    const on = ai.aiReady();
+    b.hidden = !on;
+    b.textContent = "✳";
+    b.title = on ? "Assistente ligado" : "";
+  };
+  bus.on("ai:status", paintAi);
+  paintAi();
 
   // re-render reativo
   bus.on("pages:changed", () => { renderSidebar(); renderBreadcrumb(); });

@@ -16,8 +16,9 @@ import {
   positionFloating, fmtRelative, fmtDate, readingTime, clamp, isMac,
 } from "../core/utils.js";
 import { showMenu, closeMenus, toast, showModal, emojiPicker, confirmDialog, promptDialog } from "../core/ui.js";
-import { pageToMarkdown, pageToHtml } from "../core/markdown.js";
+import { pageToMarkdown, pageToHtml, markdownToBlocks } from "../core/markdown.js";
 import { hasPin, isUnlocked, setPin, verifyPin } from "../core/privacy.js";
+import * as ai from "../core/ai.js";
 
 /* ── Definições de blocos para o slash menu ── */
 const BLOCK_DEFS = [
@@ -2182,6 +2183,75 @@ function hideFmtBar() {
   fmtBar = null;
 }
 
+/* ═══════════ Assistente de IA sobre a página ═══════════
+   Nada é enviado sem um clique: cada ação monta o pedido, mostra a resposta
+   em streaming e só insere no documento se você mandar. */
+const AI_ACTIONS = {
+  resumir: {
+    title: "Resumir a página",
+    prompt: "Resuma a página em até 8 tópicos curtos, destacando decisões, números e pendências. Devolva só a lista.",
+  },
+  continuar: {
+    title: "Continuar escrevendo",
+    prompt: "Continue o texto da página a partir de onde ele parou, no mesmo tom, idioma e formato. Devolva apenas a continuação, sem repetir o que já está escrito.",
+  },
+  tarefas: {
+    title: "Gerar tarefas",
+    prompt: "Leia a página e devolva as tarefas acionáveis em Markdown, uma por linha no formato `- [ ] tarefa`, sem texto antes ou depois.",
+  },
+};
+
+async function aiAction(page, kind) {
+  const spec = AI_ACTIONS[kind];
+  if (!spec) return;
+  const { renderMd } = await import("./assistant.js");
+
+  const out = h("div", { class: "ai-body ai-modal-body" }, h("span", { class: "ai-cursor" }));
+  const insertBtn = h("button", { class: "btn primary", disabled: true }, "Inserir no fim da página");
+  const copyBtn = h("button", { class: "btn ghost", disabled: true }, "⧉ Copiar");
+  const stopBtn = h("button", { class: "btn ghost" }, "■ Parar");
+
+  const ctrl = new AbortController();
+  const modal = showModal({
+    title: "✳ " + spec.title,
+    body: out,
+    footer: [stopBtn, copyBtn, insertBtn],
+    width: 620,
+    onClose: () => { try { ctrl.abort(); } catch {} },
+  });
+  stopBtn.onclick = () => { try { ctrl.abort(); } catch {} };
+
+  let text = "";
+  try {
+    text = await ai.chat([{ role: "user", content: spec.prompt }], {
+      system: ai.SYSTEM_PT + "\n\nConteúdo da página \"" + (page.title || "Sem título") + "\":\n\n" + ai.clipContext(pageToMarkdown(page)),
+      signal: ctrl.signal,
+      onToken: (t) => { text += t; out.innerHTML = renderMd(text) + '<span class="ai-cursor"></span>'; },
+    });
+  } catch (e) {
+    if (e?.name !== "AbortError") {
+      out.innerHTML = "";
+      out.appendChild(h("p", { class: "ai-err" }, "⚠ " + String(e.message || e)));
+      stopBtn.remove();
+      return;
+    }
+  }
+  out.innerHTML = renderMd(text) || "<p>(resposta vazia)</p>";
+  stopBtn.remove();
+  if (!text.trim()) return;
+  copyBtn.disabled = false;
+  insertBtn.disabled = false;
+  copyBtn.onclick = () => { navigator.clipboard?.writeText(text); toast("Copiado ✓"); };
+  insertBtn.onclick = () => {
+    const blocks = markdownToBlocks(text);
+    if (!blocks.length) { toast("Nada para inserir", { type: "warn" }); return; }
+    state.page.blocks.push(...blocks);
+    commit({ structural: true });
+    modal.close();
+    toast(`${blocks.length} bloco(s) inseridos no fim da página`);
+  };
+}
+
 /* ═══════════ Topbar: histórico, foco, menu ═══════════ */
 function setupTopbar(page) {
   const actions = document.getElementById("topbar-actions");
@@ -2195,6 +2265,18 @@ function setupTopbar(page) {
 
   const historyBtn = h("button", { class: "icon-btn", title: "Histórico de versões", "aria-label": "Histórico" }, "↺");
   historyBtn.onclick = () => showHistory(page);
+
+  const aiBtn = ai.aiReady()
+    ? h("button", { class: "icon-btn ai-topbar-btn", title: "Assistente de IA", "aria-label": "Assistente de IA" }, "✳")
+    : null;
+  if (aiBtn) aiBtn.onclick = (e) => showMenu(e.currentTarget, [
+    { label: "Sobre esta página" },
+    { icon: "📝", title: "Resumir a página", action: () => aiAction(page, "resumir") },
+    { icon: "✍", title: "Continuar escrevendo", action: () => aiAction(page, "continuar") },
+    { icon: "✓", title: "Gerar tarefas", action: () => aiAction(page, "tarefas") },
+    { sep: true },
+    { icon: "💬", title: "Perguntar ao assistente", action: () => navigate("assistant", page.id) },
+  ], { align: "right" });
 
   const moreBtn = h("button", { class: "icon-btn", title: "Mais opções", "aria-label": "Mais opções" }, "⋯");
   moreBtn.onclick = (e) => showMenu(e.currentTarget, [
@@ -2247,7 +2329,7 @@ function setupTopbar(page) {
     } },
   ], { align: "right" });
 
-  actions.append(presBtn, focusBtn, historyBtn, moreBtn);
+  actions.append(...[aiBtn, presBtn, focusBtn, historyBtn, moreBtn].filter(Boolean));
 }
 
 /* ═══════════ Modo apresentação (página → slides) ═══════════ */

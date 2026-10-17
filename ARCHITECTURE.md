@@ -1,7 +1,8 @@
 # NEXUS — Arquitetura e contratos internos
 
-Workspace all-in-one com IA 100% local. **Sem build step**: HTML + CSS + ES modules puros,
-servido estático. Dados em IndexedDB. IA via WebLLM/WebGPU carregada sob demanda.
+Workspace all-in-one local-first. **Sem build step**: HTML + CSS + ES modules puros,
+servido estático. Dados em IndexedDB. A IA é opcional e mora fora do app: um gateway
+que a própria pessoa roda (ver "Assistente de IA" no fim).
 
 ## Estrutura
 
@@ -15,7 +16,7 @@ css/
   editor.css          editor de blocos — NÃO editar
   database.css        views de database
   time.css            módulo Tempo (planejador, timeline, cronômetro, metas, revisão)
-  assistant.css       assistente IA
+  assistant.css       assistente de IA (conversa, composer, markdown das respostas)
   views.css           home/daily/settings/templates/trash/search/graph
 js/
   app.js              boot: registra rotas lazy → js/modules/*.js
@@ -29,14 +30,15 @@ js/
     utils.js          h(tag,attrs,...children), uid, debounce, throttle, clamp, escapeHtml, stripHtml, sanitizeInline, fuzzyScore, highlightMatch, todayKey, fmtDate, fmtRelative, flip(container,mutate), positionFloating, isMac, modKey, download, countWords, readingTime
     markdown.js       pageToMarkdown(page), pageToHtml(page) — HTML autocontido, sem rede —, blocksToMarkdown(blocks), markdownToBlocks(md)
     timetrack.js      cronômetro/sessões (ver abaixo) — vive fora da tela para contar durante a navegação
+    ai.js             cliente do gateway de IA (OpenAI-compatível) — ver contrato abaixo
   modules/            um módulo por rota — default export { mount(container, params), unmount() }
-  ai/                 engine WebLLM + worker
 ```
 
 ## Rotas (hash)
 
-`#/home` `#/page/:id` `#/db/:id` `#/daily` `#/graph` `#/assistant` `#/settings`
-`#/templates` `#/trash` `#/search/:query?` `#/time/:tab?` — registradas em `app.js` com import lazy.
+`#/home` `#/page/:id` `#/db/:id` `#/daily` `#/graph` `#/settings` `#/templates`
+`#/trash` `#/search/:query?` `#/time/:tab?` `#/assistant/:pageId?` — registradas em
+`app.js` com import lazy.
 `params.id` chega ao `mount(container, params)` já decodificado.
 Em `#/time` o `params.id` é a aba (`plan` · `timeline` · `track` · `goals` · `review`);
 sem aba, abre a última usada (setting `timeTab`) e o módulo corrige a URL com
@@ -133,9 +135,7 @@ Stats/backup: `workspaceStats()`, `exportWorkspace()→objeto`, `importWorkspace
 - `palette:open` · `capture:open` · `shortcuts:open` — sem payload
 - `timer:changed` `{type:"start"|"stop"|"sessions", timer?, session?}` — cronômetro; o selo
   da topbar (shell.js) e as abas Cronômetro/Revisão ouvem para repintar
-- `ai:selection` `{text, pageId, rect, apply(novoTexto)}` — editor emite ao clicar "✳ IA" na barra de seleção; o assistente deve ouvir e abrir popover de ações
-- `ai:page` `{pageId}` — botão "✳ IA" do topbar da página
-- `ai:status` `{status, modelId, progress}` — engine emite mudanças de estado
+- `ai:status` `{enabled, model, baseUrl}` ou `{ok, models|error}` — emitido por `setAiConfig()` e `ping()`; o selo da navegação (shell.js) e a tela do assistente ouvem para repintar
 
 ## Convenções de UI (OBRIGATÓRIAS)
 
@@ -147,12 +147,36 @@ Stats/backup: `workspaceStats()`, `exportWorkspace()→objeto`, `importWorkspace
 - `h()` de utils.js para construir DOM; nunca innerHTML com dados do usuário sem `escapeHtml`.
 - Overlays via `ui.js` (showMenu/showModal/toast) para consistência.
 
-## IA local — restrições
+## Assistente de IA — contrato (js/core/ai.js + js/modules/assistant.js)
 
-- PROIBIDO: fetch para APIs de IA de terceiros, API keys, backend.
-- WebLLM (`@mlc-ai/web-llm` via https://esm.run) importado **dinamicamente** só quando o usuário ativa IA; roda em Web Worker (module worker).
-- Sem WebGPU → o app continua 100% funcional; recursos de IA mostram aviso elegante.
-- Estado/config da IA em settings (`aiModel`, `aiPersona`, `aiMemory` via store aiMemory).
+Regra que não muda: **o NEXUS não embute provedor de IA nem API key, e não fala com
+API de terceiro.** Ele fala com UM gateway que a pessoa roda — o
+[OmniRoute](https://github.com/diegosouzapw/OmniRoute) em `http://localhost:20128/v1`,
+ou qualquer servidor compatível com a API da OpenAI. Quem guarda credencial de
+provedor é o gateway; quem escolhe se liga é a pessoa.
+
+- Desligado de fábrica. Config em settings `aiGateway`:
+  `{enabled, baseUrl, apiKey, model, temperature}` (padrão `enabled:false`,
+  `baseUrl:"http://localhost:20128/v1"`, `model:"auto"`).
+- `aiReady()` guarda toda a superfície de IA: sem ele ligado, o botão ✳ do editor
+  não existe, o selo da navegação fica apagado e a rota `#/assistant` só explica
+  como ligar. **Nenhuma requisição nasce sozinha** — toda chamada vem de um clique.
+- API: `aiConfig()`, `setAiConfig(patch)`, `aiReady()`, `listModels()`,
+  `ping()` (nunca lança — devolve `{ok, models|error}`), `chat(messages, {system,
+  model, temperature, signal, onToken})`, `complete(prompt, opts)`,
+  `clipContext(texto, limite=12000)`, `SYSTEM_PT`.
+- `chat()` pede `stream:true` e lê SSE (`data: {...}` / `data: [DONE]`), chamando
+  `onToken` a cada delta; se o gateway devolver JSON em vez de stream, cai no
+  caminho não-streaming sozinho. `signal` (AbortController) para o "Parar".
+- Erros viram recado acionável em vez de "Failed to fetch": gateway fora do ar,
+  chave recusada (401), rota errada (404), limite do provedor (429). O caso
+  https→http://localhost (mixed content) é citado explicitamente, porque é o que
+  trava quem abre o NEXUS publicado e roda o gateway na própria máquina.
+- Resposta do modelo é **dado, não HTML**: `renderMd()` (assistant.js) escapa tudo
+  antes de aplicar Markdown, então nada que venha do provedor vira elemento ativo.
+- Contexto só vai quando a pessoa anexa: o conteúdo da página entra na mensagem de
+  *system* via `pageToMarkdown` + `clipContext`, nunca misturado à pergunta.
+- Conversa fica em settings `aiChat` (últimas 40 mensagens), neste aparelho.
 
 ## Verificação local
 
