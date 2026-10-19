@@ -98,7 +98,10 @@ function wizard() {
   const sqlBox = h("pre", { class: "cloud-sql" }, h("code", {}, sync.SETUP_SQL));
   box.appendChild(step(2, "Crie a tabela cifrada",
     h("div", {},
-      h("p", { class: "cloud-step-text" }, "No projeto: SQL Editor → New query, cole e clique em Run. Isso cria a tabela e a trava por usuário (RLS)."),
+      h("p", { class: "cloud-step-text" },
+        "No menu do projeto: ", h("strong", {}, "SQL Editor"), " → ", h("strong", {}, "New query"),
+        ", cole tudo e clique em ", h("strong", {}, "Run"), " (ou Ctrl+Enter). Dá para rodar de novo sem medo — ",
+        "no fim ele responde ", h("code", {}, "tabela workspaces pronta"), ", e aí deu certo."),
       sqlBox,
       h("button", { class: "btn ghost", onclick: async () => {
         try { await navigator.clipboard.writeText(sync.SETUP_SQL); toast("SQL copiado ✓"); }

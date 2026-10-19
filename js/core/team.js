@@ -288,19 +288,33 @@ export function leaveTeam({ keepReports = false } = {}) {
   bus.emit("team:changed", { type: "left" });
 }
 
-export const SETUP_SQL = `create table if not exists team_reports (
+export const SETUP_SQL = `-- NEXUS · espaço da equipe. Pode rodar quantas vezes quiser.
+create table if not exists team_reports (
   team_id text not null,
   member_id text not null,
   user_id uuid references auth.users(id) on delete cascade,
-  data text, iv text,
+  data text,
+  iv text,
   updated_at timestamptz default now(),
   primary key (team_id, member_id)
 );
+
 alter table team_reports enable row level security;
--- quem está logado no projeto lê os relatórios (o conteúdo é cifrado com a senha da equipe)
-create policy "team read" on team_reports for select to authenticated using (true);
-create policy "own insert" on team_reports for insert to authenticated with check (auth.uid() = user_id);
-create policy "own update" on team_reports for update to authenticated using (auth.uid() = user_id);`;
+
+-- quem está logado no projeto lê os relatórios; o conteúdo é cifrado com a senha da equipe
+drop policy if exists "team read" on team_reports;
+create policy "team read" on team_reports
+  for select to authenticated using (true);
+
+drop policy if exists "own insert" on team_reports;
+create policy "own insert" on team_reports
+  for insert to authenticated with check (auth.uid() = user_id);
+
+drop policy if exists "own update" on team_reports;
+create policy "own update" on team_reports
+  for update to authenticated using (auth.uid() = user_id);
+
+select 'tabela team_reports pronta' as nexus;`;
 
 /* ═══════════ publicação automática ═══════════
    Nada de ficar subindo a cada tecla: marca "sujo" e, no máximo a cada 5

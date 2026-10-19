@@ -314,14 +314,24 @@ export async function diagnose() {
 }
 
 /* ── SQL de setup (mostrado nas Configurações) ── */
-export const SETUP_SQL = `create table if not exists workspaces (
+export const SETUP_SQL = `-- NEXUS · sincronização. Pode rodar quantas vezes quiser.
+create table if not exists workspaces (
   user_id uuid primary key references auth.users(id) on delete cascade,
-  data text, iv text,
+  data text,
+  iv text,
   updated_at timestamptz default now()
 );
+
 alter table workspaces enable row level security;
+
+-- recria a regra de acesso (cada pessoa só enxerga a própria linha)
+drop policy if exists "own row" on workspaces;
 create policy "own row" on workspaces
-  for all using (auth.uid() = user_id) with check (auth.uid() = user_id);`;
+  for all
+  using (auth.uid() = user_id)
+  with check (auth.uid() = user_id);
+
+select 'tabela workspaces pronta' as nexus;`;
 
 export async function initSync() {
   await resumeSession();
