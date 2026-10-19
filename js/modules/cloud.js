@@ -7,14 +7,14 @@
 import { getSetting, workspaceStats } from "../core/store.js";
 import { bus } from "../core/bus.js";
 import { h, fmtRelative } from "../core/utils.js";
-import { toast, confirmDialog } from "../core/ui.js";
+import { toast, confirmDialog, showModal } from "../core/ui.js";
 import * as sync from "../core/sync.js";
 
 let state = null;
 
 export default {
-  async mount(container) {
-    state = { container, busy: false, diag: null, offs: [] };
+  async mount(container, params) {
+    state = { container, busy: false, diag: null, invite: readInvite(params?.id), offs: [] };
     state.offs.push(bus.on("sync:status", () => { if (state) render(); }));
     render();
   },
@@ -27,6 +27,77 @@ export default {
 const plural = (n, um, muitos) => `${n} ${n === 1 ? um : muitos}`;
 const appUrl = () => location.origin + location.pathname.replace(/index\.html$/, "");
 
+/* ═══════════ link de configuração entre aparelhos ═══════════
+   Leva só o endereço do projeto e a chave PÚBLICA — nunca a sua senha, que é
+   o que de fato decifra os dados. Mesmo assim, aplicar exige confirmação: um
+   link malicioso poderia apontar o app para o projeto de outra pessoa. */
+const b64url = (txt) => btoa(unescape(encodeURIComponent(txt))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+const unb64url = (txt) => decodeURIComponent(escape(atob(txt.replace(/-/g, "+").replace(/_/g, "/")))); 
+
+export function deviceLink() {
+  const u = getSetting("supabaseUrl", ""), k = getSetting("supabaseKey", "");
+  if (!u || !k) return "";
+  return appUrl() + "#/cloud/" + b64url(JSON.stringify({ v: 1, u, k }));
+}
+
+function readInvite(raw) {
+  if (!raw || raw.length < 12) return null;
+  try {
+    const obj = JSON.parse(unb64url(raw));
+    if (obj?.v !== 1 || !obj.u || !obj.k || !validProjectUrl(obj.u)) return null;
+    if (getSetting("supabaseUrl", "") === obj.u) return null;   // já é este projeto
+    return obj;
+  } catch { return null; }
+}
+
+function inviteCard(inv) {
+  let host = inv.u;
+  try { host = new URL(inv.u).host; } catch {}
+  const box = h("section", { class: "card cloud-invite" });
+  box.appendChild(h("h2", {}, "Configurar este aparelho"));
+  box.appendChild(h("p", { class: "cloud-lead" },
+    "O link que você abriu aponta para o projeto ", h("strong", {}, host),
+    ". Ele traz só o endereço e a chave pública — a sua senha não vai em link nenhum, e é ela que decifra os dados."));
+  box.appendChild(h("p", { class: "cloud-warn" },
+    "⚠ Só continue se foi você quem gerou este link no seu outro aparelho."));
+  const usar = h("button", { class: "btn primary" }, "Usar este projeto");
+  usar.onclick = () => {
+    sync.saveConfig(inv.u, inv.k);
+    state.invite = null;
+    history.replaceState(null, "", "#/cloud");
+    toast("Projeto configurado — agora entre com o seu e-mail e senha");
+    bus.emit("sync:status", sync.syncState());
+  };
+  const nao = h("button", { class: "btn ghost" }, "Agora não");
+  nao.onclick = () => { state.invite = null; history.replaceState(null, "", "#/cloud"); render(); };
+  box.appendChild(h("div", { class: "btn-row" }, usar, nao));
+  return box;
+}
+
+function shareSetup() {
+  const link = deviceLink();
+  if (!link) { toast("Configure o projeto primeiro", { type: "warn" }); return; }
+  const field = h("div", { class: "cloud-url" }, h("code", {}, link));
+  const copiar = h("button", { class: "btn primary" }, "⧉ Copiar link");
+  copiar.onclick = async () => {
+    try { await navigator.clipboard.writeText(link); toast("Link copiado ✓"); }
+    catch { toast("Selecione o texto e copie manualmente", { type: "warn" }); }
+  };
+  showModal({
+    title: "Configurar outro aparelho",
+    width: 620,
+    body: h("div", {},
+      h("p", { class: "cloud-lead" },
+        "Mande este link para você mesmo (WhatsApp, e-mail, o que for) e abra no outro aparelho: ",
+        "ele já chega com o projeto preenchido, é só entrar com o seu e-mail e senha."),
+      field,
+      h("p", { class: "settings-hint" },
+        "O link leva o endereço do projeto e a chave pública — a mesma que fica dentro de qualquer app do Supabase. ",
+        "Não leva a sua senha: sem ela, o que está lá continua ilegível para qualquer um.")),
+    footer: [copiar],
+  });
+}
+
 function render() {
   if (!state) return;
   const { container } = state;
@@ -38,6 +109,7 @@ function render() {
     h("h1", { class: "home-greeting" }, "Nuvem"),
     h("p", { class: "cloud-sub" }, "Use o NEXUS de qualquer aparelho, com os seus dados cifrados antes de sair daqui.")));
 
+  if (state.invite) wrap.appendChild(inviteCard(state.invite));
   wrap.appendChild(statusCard(st));
 
   if (!st.configured) wrap.appendChild(wizard());
@@ -335,6 +407,10 @@ function reachCard() {
       catch { toast("Copie da barra de endereço", { type: "warn" }); }
     } }, "⧉ Copiar"));
   box.appendChild(field);
+  if (sync.syncState().configured) {
+    box.appendChild(h("div", { class: "btn-row", style: "margin-bottom:14px" },
+      h("button", { class: "btn", onclick: () => shareSetup() }, "📱 Gerar link de configuração")));
+  }
   box.appendChild(h("ul", { class: "cloud-tips" },
     h("li", {}, h("strong", {}, "Instalar como app:"), " no celular, menu do navegador → “Adicionar à tela inicial”. No computador, o ícone de instalar na barra de endereço. Fica igual a um aplicativo, com ícone próprio e funcionando offline."),
     h("li", {}, h("strong", {}, "Sem internet:"), " o app abre e funciona normalmente com o que já está no aparelho; ao voltar a rede, ele sincroniza sozinho."),

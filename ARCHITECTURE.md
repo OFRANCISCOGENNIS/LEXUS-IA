@@ -181,6 +181,17 @@ salt `nexus:<email>`), então o painel do Supabase mostra só texto embaralhado.
   conserto em texto. É o que a tela da Nuvem mostra em "Testar tudo".
 - `validProjectUrl()` (cloud.js) aceita https em qualquer domínio (Supabase
   hospedado ou próprio) e http só em localhost/127.0.0.1.
+- `keyProblem()` (cloud.js) barra antes de chamar o servidor o que não é chave:
+  texto curto (costuma ser a senha do banco, que o Supabase pede na criação do
+  projeto) e, principalmente, `sb_secret_`/`service_role` — essa dá acesso
+  total ao banco e não pode viver num app de navegador.
+- `deviceLink()` gera `#/cloud/<base64>` com `{v,u,k}` — endereço do projeto e
+  chave pública, nunca a senha. Abrir o link em outro aparelho não aplica nada
+  sozinho: mostra de qual projeto é e exige confirmação, porque um link
+  forjado poderia apontar o app para o Supabase de outra pessoa.
+- O SQL de setup é idempotente (`drop policy if exists` antes de criar) e
+  termina com um `select` de confirmação: rodar de novo no SQL Editor não
+  pode dar erro, senão a pessoa fica sem saber se a tabela existe.
 
 ## Equipe — contrato (js/core/team.js + js/modules/team.js)
 
