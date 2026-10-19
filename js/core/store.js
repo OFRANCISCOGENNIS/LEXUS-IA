@@ -559,29 +559,104 @@ export function workspaceStats() {
 }
 
 /* ── Export / Import ── */
+/* Settings que NUNCA entram num snapshot: segredo local (a senha da equipe) ou
+   estado do aparelho (cronômetro correndo, barra lateral, recentes). Fora isso,
+   as preferências viajam — é o que faz o workspace ser o mesmo em qualquer lugar. */
+export const LOCAL_ONLY_SETTINGS = new Set([
+  "teamKey",       // segredo da equipe
+  "timeActive",    // cronômetro correndo agora
+  "recentPages", "sidebarExpanded",
+  "deviceName", "lastSyncAt", "lastRemoteDevice", // identidade e estado deste aparelho
+]);
+/* Além das acima, a configuração do projeto não é importada: trocá-la no meio de
+   uma sincronização derrubaria a conexão que está trazendo os dados. */
+const NEVER_IMPORT_SETTINGS = new Set([...LOCAL_ONLY_SETTINGS, "supabaseUrl", "supabaseKey"]);
+
 export async function exportWorkspace() {
   await persistAllDirty();
   const [pgs, dbs, sts, trash] = await Promise.all([
     idb.getAll("pages"), idb.getAll("databases"), idb.getAll("settings"), idb.getAll("trash"),
   ]);
   return {
-    app: "nexus", version: 1, exportedAt: new Date().toISOString(),
-    pages: pgs, databases: dbs, settings: sts, trash,
+    app: "nexus", version: 2, exportedAt: new Date().toISOString(),
+    device: deviceName(),
+    pages: pgs, databases: dbs,
+    settings: sts.filter((s) => !LOCAL_ONLY_SETTINGS.has(s.key)),
+    trash,
   };
 }
 
+/* Nome amigável do aparelho — aparece como "última alteração veio de…" */
+export function deviceName() {
+  let name = settings.get("deviceName");
+  if (name) return name;
+  const ua = navigator.userAgent || "";
+  const os = /Android/i.test(ua) ? "Android" : /iPhone|iPad|iPod/i.test(ua) ? "iPhone/iPad"
+    : /Mac OS X/i.test(ua) ? "Mac" : /Windows/i.test(ua) ? "Windows"
+    : /Linux/i.test(ua) ? "Linux" : "Dispositivo";
+  const browser = /Edg\//.test(ua) ? "Edge" : /OPR\//.test(ua) ? "Opera"
+    : /Chrome\//.test(ua) ? "Chrome" : /Safari\//.test(ua) ? "Safari"
+    : /Firefox\//.test(ua) ? "Firefox" : "navegador";
+  name = `${os} · ${browser}`;
+  setSetting("deviceName", name);
+  return name;
+}
+
+/* Mescla item a item pelo updatedAt: o mais recente vence, dos dois lados.
+   Antes o remoto sobrescrevia tudo — editar no celular e sincronizar depois
+   apagava a edição feita no computador. */
 export async function importWorkspace(data, { merge = true } = {}) {
   if (!data || data.app !== "nexus") throw new Error("Arquivo de backup inválido");
   if (!merge) {
     pages.clear(); databases.clear();
     await Promise.all([idb.clear("pages"), idb.clear("databases")]);
   }
-  (data.pages || []).forEach((p) => pages.set(p.id, p));
-  (data.databases || []).forEach((d) => databases.set(d.id, d));
-  await Promise.all([
-    idb.putMany("pages", data.pages || []),
-    idb.putMany("databases", data.databases || []),
-  ]);
+
+  const stats = { pages: 0, databases: 0, settings: 0, removed: 0, skipped: 0 };
+  const pagesIn = [], dbsIn = [];
+
+  (data.pages || []).forEach((p) => {
+    if (!p?.id) return;
+    const cur = merge ? pages.get(p.id) : null;
+    if (cur && (cur.updatedAt || 0) > (p.updatedAt || 0)) { stats.skipped++; return; }
+    pages.set(p.id, p); pagesIn.push(p); stats.pages++;
+  });
+  (data.databases || []).forEach((d) => {
+    if (!d?.id) return;
+    const cur = merge ? databases.get(d.id) : null;
+    if (cur && (cur.updatedAt || 0) > (d.updatedAt || 0)) { stats.skipped++; return; }
+    databases.set(d.id, d); dbsIn.push(d); stats.databases++;
+  });
+
+  await Promise.all([idb.putMany("pages", pagesIn), idb.putMany("databases", dbsIn)]);
+
+  /* Lápides: o que o outro aparelho mandou para a lixeira sai daqui também —
+     senão o item "ressuscita" no próximo push de quem ainda o tinha. */
+  if (merge) {
+    for (const t of data.trash || []) {
+      const id = t?.data?.id;
+      const at = t?.deletedAt || 0;
+      if (!id) continue;
+      const localPage = pages.get(id), localDb = databases.get(id);
+      const local = localPage || localDb;
+      if (!local || (local.updatedAt || 0) > at) continue;   // editado depois de apagado → fica
+      if (localPage) { pages.delete(id); await idb.del("pages", id); }
+      else { databases.delete(id); await idb.del("databases", id); }
+      await idb.put("trash", t);
+      stats.removed++;
+    }
+  }
+
+  /* Preferências, blocos de tempo, metas, templates… tudo o que vive em settings */
+  for (const s of data.settings || []) {
+    if (!s?.key || NEVER_IMPORT_SETTINGS.has(s.key)) continue;
+    settings.set(s.key, s.value);
+    await idb.put("settings", { key: s.key, value: s.value });
+    stats.settings++;
+  }
+
   bus.emit("pages:changed", { type: "import" });
   bus.emit("dbs:changed", { type: "import" });
+  if (stats.settings) bus.emit("settings:changed", { key: "*", value: null });
+  return stats;
 }

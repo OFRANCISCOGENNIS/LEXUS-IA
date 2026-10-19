@@ -22,7 +22,7 @@ O NEXUS é um workspace de produtividade estilo Notion/Craft/Capacities,
 | 🔐 **Privacidade** | Páginas privadas com PIN local, bloqueio somente-leitura, lixeira e arquivo |
 | 👥 **Equipe** (opcional) | Painel para acompanhar o time: pendentes, atrasadas, entregas da semana, horas e plano cumprido por pessoa, tarefas consolidadas e fechamento semanal exportável. Cada um publica um **relatório** (só metadados de trabalho — nunca o conteúdo das páginas), cifrado no aparelho com a senha da equipe. Dá para trocar relatórios por arquivo, sem servidor nenhum |
 | ✳ **Assistente de IA** (opcional, desligado) | Conversa, resume página, continua o texto e gera tarefas — falando com um gateway que **você** roda na sua máquina ([OmniRoute](https://github.com/diegosouzapw/OmniRoute), MIT): 374 provedores, 150+ camadas gratuitas, ou um modelo local (Ollama/LM Studio) e aí nada sai do computador. Sem API key embutida no app, sem backend nosso |
-| ☁ **Sincronização entre dispositivos** (opcional) | Login por e-mail/senha, dados cifrados no dispositivo (AES-256) antes de subir a um projeto Supabase seu — o servidor só guarda texto cifrado. Selo na sidebar mostra o status e leva direto à configuração (~5 min, grátis) |
+| ☁ **Nuvem — usar de qualquer lugar** (opcional) | Tela própria (`#/cloud`) com assistente de 3 passos que **verifica cada etapa**, diagnóstico que diz o que fazer quando algo falha, status com nome do aparelho e última sincronização, e o endereço para abrir no celular. Os dados são cifrados aqui (AES-256) antes de subir a um projeto Supabase **seu**. Conflito entre aparelhos é resolvido item a item: a versão mais recente vence, e o que você apaga num aparelho some nos outros |
 | 📱 **PWA + Mobile** | Instalável, offline após primeira carga, sidebar em drawer no celular |
 | ⎙ **Export** | Markdown, **HTML autocontido**, CSV, JSON e **PDF** (impressão limpa) |
 | 🏠 **Painel personalizável** | Widgets da Home reordenáveis e ocultáveis (ações rápidas, para hoje, **agenda de hoje**, recentes, databases, atividade, estatísticas) |
@@ -52,7 +52,7 @@ Detalhes de arquitetura e contratos internos em [ARCHITECTURE.md](ARCHITECTURE.m
 
 - **Local por padrão.** Sem conta, sem servidor nosso, sem telemetria: fechou o app, os dados continuam só no seu aparelho (IndexedDB), exportáveis a qualquer momento.
 - Existem exatamente **dois caminhos de saída, ambos opcionais e desligados de fábrica**:
-  1. **Sincronização** — cifra tudo neste dispositivo (AES-256) antes de subir para um projeto Supabase seu; o servidor só vê texto cifrado.
+  1. **Nuvem** — cifra tudo neste dispositivo (AES-256) antes de subir para um projeto Supabase seu; o servidor só vê texto cifrado. A senha nunca é enviada: a chave é derivada dela aqui. Ficam de fora do snapshot a senha da equipe, o cronômetro em andamento e o estado deste aparelho.
   2. **Assistente de IA** — só o texto que você mandar, e só para o gateway que você apontar. Com um modelo local atrás do gateway, nada sai do computador.
   3. **Equipe** — só o relatório (tarefas, prazos, horas e números), cifrado aqui com a senha da equipe antes de sair. Páginas privadas nunca entram, o conteúdo das páginas nunca é enviado, e há um botão para ver exatamente o que sairia.
 - Nenhuma chave de API vive no código do NEXUS: quem guarda credencial de provedor é o seu gateway.

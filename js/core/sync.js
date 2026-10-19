@@ -4,7 +4,7 @@
 // o servidor guarda apenas texto cifrado. O app continua local-first: sem
 // configurar/entrar, tudo funciona 100% offline como antes.
 
-import { getSetting, setSetting, exportWorkspace, importWorkspace } from "./store.js";
+import { getSetting, setSetting, exportWorkspace, importWorkspace, deviceName } from "./store.js";
 import { bus } from "./bus.js";
 
 const SUPABASE_CDN = "https://esm.sh/@supabase/supabase-js@2";
@@ -18,8 +18,22 @@ let pullTimer = null;
 let status = "off";     // off | ready | syncing | error | locked
 
 /* ── Estado / eventos ── */
+let lastPushAt = null, lastPullAt = null;
 function setStatus(s, extra = {}) { status = s; bus.emit("sync:status", { status: s, user, ...extra }); }
-export function syncState() { return { status, user, configured: isConfigured(), unlocked: !!encKey }; }
+export function syncState() {
+  return {
+    status, user, configured: isConfigured(), unlocked: !!encKey,
+    lastPushAt, lastPullAt,
+    lastSyncAt: lastPushAt || lastPullAt || getSetting("lastSyncAt", null),
+    device: deviceName(),
+    remoteDevice: getSetting("lastRemoteDevice", null),
+  };
+}
+function markSync(kind) {
+  const now = Date.now();
+  if (kind === "push") lastPushAt = now; else lastPullAt = now;
+  setSetting("lastSyncAt", now);   // local-only: não entra no snapshot
+}
 export const isConfigured = () => !!(getSetting("supabaseUrl", "") && getSetting("supabaseKey", ""));
 
 /* ── Config ── */
@@ -168,6 +182,7 @@ export async function pushNow({ force = false } = {}) {
     });
     if (error) throw error;
     lastPushHash = hash;
+    markSync("push");
     setStatus("ready", { at: Date.now() });
   } catch (e) { setStatus("error", { message: e.message }); throw e; }
 }
@@ -179,9 +194,12 @@ export async function pullNow() {
     if (!remote) return;
     if (remote.updated_at && remote.updated_at === lastPulledAt) return; // remoto inalterado
     const data = await decryptJSON(remote.data, remote.iv);
-    await importWorkspace(data, { merge: true }); // remoto vence em conflito por id
+    // mescla item a item pelo updatedAt (o mais recente vence dos dois lados)
+    const stats = await importWorkspace(data, { merge: true });
+    if (data.device) setSetting("lastRemoteDevice", data.device);
     lastPulledAt = remote.updated_at || null;
-    setStatus("ready", { at: Date.now() });
+    markSync("pull");
+    setStatus("ready", { at: Date.now(), stats });
   } catch (e) { setStatus("error", { message: e.message }); }
 }
 
@@ -223,6 +241,77 @@ export async function authToken() {
   } catch { tokenMiss = Date.now(); return null; }
 }
 export const currentUser = () => user;
+
+/* ── Diagnóstico ──
+   Checa o projeto com fetch puro (sem SDK): cada passo diz exatamente o que
+   fazer quando falha. É o que transforma "configurei e não funciona" em algo
+   resolvível sem adivinhação. */
+export async function diagnose() {
+  const url = String(getSetting("supabaseUrl", "") || "").replace(/\/+$/, "");
+  const key = getSetting("supabaseKey", "") || "";
+  const steps = [];
+  const add = (name, ok, detail, fix = "") => steps.push({ name, ok, detail, fix });
+
+  if (!url || !key) {
+    add("Projeto configurado", false, "URL ou chave ausente", "Preencha a URL do projeto e a chave anon public.");
+    return { ok: false, steps };
+  }
+  add("Projeto configurado", true, url.replace(/^https:\/\//, ""));
+
+  // 1) API REST responde?
+  try {
+    const r = await fetch(`${url}/rest/v1/`, { headers: { apikey: key } });
+    if (r.ok || r.status === 404) add("API do projeto responde", true, `HTTP ${r.status}`);
+    else if (r.status === 401) add("API do projeto responde", false, "HTTP 401", "A chave anon public não confere. Copie de novo em Project Settings → API.");
+    else add("API do projeto responde", false, `HTTP ${r.status}`, "Confira a URL do projeto.");
+  } catch {
+    add("API do projeto responde", false, "sem resposta",
+      "Confira a URL (https://xxxx.supabase.co), a conexão, e se o projeto não está pausado por inatividade no painel do Supabase.");
+  }
+
+  // 2) tabela workspaces existe?
+  try {
+    const r = await fetch(`${url}/rest/v1/${TABLE}?select=user_id&limit=1`, { headers: { apikey: key } });
+    const body = await r.text();
+    if (r.ok) add("Tabela de sincronização", true, "workspaces encontrada");
+    else if (/does not exist/i.test(body) || r.status === 404) {
+      add("Tabela de sincronização", false, "workspaces não existe",
+        "Abra SQL Editor → New query no Supabase, cole o SQL desta tela e clique em Run.");
+    } else if (r.status === 401 || r.status === 403) {
+      add("Tabela de sincronização", true, "existe (protegida por RLS, como deve ser)");
+    } else add("Tabela de sincronização", false, `HTTP ${r.status}`, "Rode o SQL de setup novamente.");
+  } catch {
+    add("Tabela de sincronização", false, "sem resposta", "Resolva o passo anterior primeiro.");
+  }
+
+  // 3) serviço de contas no ar?
+  try {
+    const r = await fetch(`${url}/auth/v1/health`, { headers: { apikey: key } });
+    add("Serviço de contas", r.ok, r.ok ? "no ar" : `HTTP ${r.status}`,
+      r.ok ? "" : "O projeto pode estar pausado — abra o painel do Supabase e reative.");
+  } catch {
+    add("Serviço de contas", false, "sem resposta", "O projeto pode estar pausado no Supabase.");
+  }
+
+  // 4) criptografia funciona neste navegador?
+  try {
+    const k = await crypto.subtle.generateKey({ name: "AES-GCM", length: 256 }, false, ["encrypt", "decrypt"]);
+    const iv = crypto.getRandomValues(new Uint8Array(12));
+    const c = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, k, enc.encode("nexus"));
+    const back = dec.decode(await crypto.subtle.decrypt({ name: "AES-GCM", iv }, k, c));
+    add("Criptografia no aparelho", back === "nexus", back === "nexus" ? "AES-256-GCM ok" : "falhou",
+      back === "nexus" ? "" : "Abra o app por https:// ou http://localhost — WebCrypto exige contexto seguro.");
+  } catch {
+    add("Criptografia no aparelho", false, "indisponível",
+      "Abra o app por https:// ou http://localhost — WebCrypto exige contexto seguro.");
+  }
+
+  // 5) sessão
+  add("Sua conta", !!user, user ? user.email : "sem sessão neste aparelho",
+    user ? "" : "Entre com e-mail e senha para sincronizar.");
+
+  return { ok: steps.every((s) => s.ok), steps };
+}
 
 /* ── SQL de setup (mostrado nas Configurações) ── */
 export const SETUP_SQL = `create table if not exists workspaces (

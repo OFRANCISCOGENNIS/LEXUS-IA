@@ -349,7 +349,7 @@ export function initShell() {
       else if (a === "new-database") newDatabase();
       else if (a === "open-palette") bus.emit("palette:open", {});
       else if (a === "quick-capture") bus.emit("capture:open", {});
-      else if (a === "open-sync-settings") { setDrawer(false); navigate("settings"); }
+      else if (a === "open-sync-settings") { setDrawer(false); navigate("cloud"); }
     });
   });
 
@@ -453,7 +453,10 @@ export function initShell() {
   bus.on("dbs:changed", () => { renderSidebar(); renderBreadcrumb(); });
   bus.on("route:changed", () => { renderSidebar(); renderBreadcrumb(); });
   bus.on("settings:changed", ({ key }) => {
-    if (["theme", "accent", "density", "font", "pagewidth"].includes(key)) { applyAppearance(); paintThemeBtn(); }
+    // "*" = lote de preferências que acabou de chegar da nuvem
+    if (key === "*" || ["theme", "accent", "density", "font", "pagewidth"].includes(key)) {
+      applyAppearance(); paintThemeBtn();
+    }
   });
 
   // atalhos globais (estilo Windows)

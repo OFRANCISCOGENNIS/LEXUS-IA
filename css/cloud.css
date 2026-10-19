@@ -1,0 +1,88 @@
+/* ═══════════════ NEXUS · Nuvem ═══════════════ */
+
+.cloud-page { max-width: 820px; display: flex; flex-direction: column; gap: var(--sp-4); padding-bottom: var(--sp-8); }
+.cloud-head { margin-bottom: calc(-1 * var(--sp-2)); }
+.cloud-sub { color: var(--text-3); font-size: var(--fs-sm); margin-top: 2px; }
+.cloud-page .card { padding: var(--sp-5); }
+.cloud-page h2 { font-size: var(--fs-lg); font-weight: 650; margin-bottom: var(--sp-2); }
+.cloud-lead { color: var(--text-2); font-size: var(--fs-sm); line-height: 1.65; margin-bottom: var(--sp-4); }
+.cloud-sub-title { font-size: var(--fs-xs); font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--text-faint); margin: var(--sp-3) 0 6px; }
+
+/* ── status ── */
+.cloud-status {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: var(--sp-4); flex-wrap: wrap; padding: var(--sp-4) var(--sp-5) !important;
+  border-left: 3px solid var(--tone, var(--border-strong));
+}
+.cloud-status.tone-ok { --tone: var(--ok); }
+.cloud-status.tone-warn { --tone: var(--warn); }
+.cloud-status.tone-err { --tone: var(--danger); }
+.cloud-status.tone-sync { --tone: var(--accent); }
+.cloud-status.tone-local { --tone: var(--text-faint); }
+.cs-main { display: flex; align-items: center; gap: var(--sp-3); min-width: 0; }
+.cs-dot {
+  width: 10px; height: 10px; border-radius: var(--r-full); flex: none;
+  background: var(--tone, var(--text-faint));
+}
+.tone-sync .cs-dot { animation: cloud-pulse 1.2s var(--ease-out) infinite; }
+@keyframes cloud-pulse { 0%, 100% { opacity: 1 } 50% { opacity: .3 } }
+.cs-label { font-weight: 650; font-size: var(--fs-md); }
+.cs-meta { font-size: var(--fs-xs); color: var(--text-3); line-height: 1.5; }
+.cs-stats { display: flex; gap: var(--sp-3); font-size: var(--fs-xs); color: var(--text-3); flex-wrap: wrap; }
+
+/* ── assistente ── */
+.cloud-step { display: flex; gap: var(--sp-3); padding: var(--sp-4) 0; border-top: 1px solid var(--border); }
+.cloud-step:first-of-type { border-top: 0; padding-top: 0; }
+.cst-n {
+  width: 26px; height: 26px; flex: none; border-radius: var(--r-full);
+  display: grid; place-items: center; font-size: var(--fs-xs); font-weight: 750;
+  background: var(--accent-soft); color: var(--accent-text);
+}
+.cst-body { flex: 1; min-width: 0; }
+.cst-title { font-weight: 650; font-size: var(--fs-md); margin-bottom: 4px; }
+.cloud-step-text { font-size: var(--fs-sm); color: var(--text-2); line-height: 1.6; margin-bottom: var(--sp-3); }
+.cloud-sql {
+  font-family: var(--font-mono); font-size: 11px; line-height: 1.55;
+  background: var(--code-bg); color: var(--text);
+  padding: var(--sp-3); border-radius: var(--r-sm);
+  overflow-x: auto; margin-bottom: var(--sp-2); white-space: pre;
+  max-height: 200px; overflow-y: auto;
+}
+.cloud-msg { font-size: var(--fs-xs); color: var(--text-3); min-height: 16px; line-height: 1.5; margin-top: 6px; }
+.cloud-msg.err { color: var(--danger); }
+
+/* ── diagnóstico ── */
+.diag-list { display: flex; flex-direction: column; gap: 2px; margin-top: var(--sp-3); }
+.diag-row { display: flex; gap: var(--sp-2); padding: 7px 0; border-bottom: 1px solid var(--border); }
+.diag-row:last-child { border-bottom: 0; }
+.diag-icon { flex: none; width: 18px; text-align: center; font-weight: 700; }
+.diag-row.ok .diag-icon { color: var(--ok); }
+.diag-row.err .diag-icon { color: var(--danger); }
+.diag-body { flex: 1; min-width: 0; }
+.diag-name { font-size: var(--fs-sm); font-weight: 600; }
+.diag-detail { font-weight: 400; color: var(--text-3); }
+.diag-fix { font-size: var(--fs-xs); color: var(--danger); line-height: 1.55; margin-top: 2px; }
+
+/* ── abrir em outro aparelho ── */
+.cloud-url {
+  display: flex; align-items: center; gap: var(--sp-2); flex-wrap: wrap;
+  background: var(--surface-2); border-radius: var(--r-md);
+  padding: var(--sp-2) var(--sp-3); margin-bottom: var(--sp-3);
+}
+.cloud-url code { font-family: var(--font-mono); font-size: var(--fs-xs); flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.cloud-tips { display: flex; flex-direction: column; gap: 8px; padding-left: var(--sp-5); margin: 0; }
+.cloud-tips li { font-size: var(--fs-sm); color: var(--text-2); line-height: 1.6; }
+
+/* ── privacidade ── */
+.cloud-list { display: flex; flex-direction: column; gap: 5px; padding-left: var(--sp-5); margin: 0; }
+.cloud-list li { font-size: var(--fs-sm); color: var(--text-2); line-height: 1.55; }
+.cloud-list.yes li::marker { content: "✓  "; color: var(--ok); }
+.cloud-list.no li::marker { content: "✕  "; color: var(--danger); }
+
+@media (max-width: 720px) {
+  .cloud-page { padding-left: var(--sp-3); padding-right: var(--sp-3); }
+  .cloud-page .card { padding: var(--sp-4); }
+  .cloud-status { flex-direction: column; align-items: flex-start; gap: var(--sp-2); }
+  .cloud-step { flex-direction: column; gap: var(--sp-2); }
+  .cloud-tips, .cloud-list { padding-left: var(--sp-4); }
+}

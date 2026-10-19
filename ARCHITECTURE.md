@@ -18,6 +18,7 @@ css/
   time.css            módulo Tempo (planejador, timeline, cronômetro, metas, revisão)
   assistant.css       assistente de IA (conversa, composer, markdown das respostas)
   team.css            painel da equipe (cartões por pessoa, tarefas, semana)
+  cloud.css           tela da Nuvem (status, assistente, diagnóstico)
   views.css           home/daily/settings/templates/trash/search/graph
 js/
   app.js              boot: registra rotas lazy → js/modules/*.js
@@ -39,8 +40,8 @@ js/
 ## Rotas (hash)
 
 `#/home` `#/page/:id` `#/db/:id` `#/daily` `#/graph` `#/settings` `#/templates`
-`#/trash` `#/search/:query?` `#/time/:tab?` `#/assistant/:pageId?` `#/team/:tab?` —
-registradas em `app.js` com import lazy.
+`#/trash` `#/search/:query?` `#/time/:tab?` `#/assistant/:pageId?` `#/team/:tab?`
+`#/cloud` — registradas em `app.js` com import lazy.
 `params.id` chega ao `mount(container, params)` já decodificado.
 Em `#/time` o `params.id` é a aba (`plan` · `timeline` · `track` · `goals` · `review`);
 sem aba, abre a última usada (setting `timeTab`) e o módulo corrige a URL com
@@ -150,6 +151,36 @@ Stats/backup: `workspaceStats()`, `exportWorkspace()→objeto`, `importWorkspace
 - Ícones: caracteres unicode/emoji (sem libs externas).
 - `h()` de utils.js para construir DOM; nunca innerHTML com dados do usuário sem `escapeHtml`.
 - Overlays via `ui.js` (showMenu/showModal/toast) para consistência.
+
+## Nuvem / sincronização (js/core/sync.js + js/modules/cloud.js)
+
+Opcional e desligada de fábrica. O servidor é um projeto Supabase **do usuário**;
+o conteúdo sobe cifrado (AES-GCM, chave derivada da senha por PBKDF2 150k com
+salt `nexus:<email>`), então o painel do Supabase mostra só texto embaralhado.
+
+- **Snapshot** (`exportWorkspace`): `{app, version:2, device, pages, databases,
+  settings, trash}`. `LOCAL_ONLY_SETTINGS` nunca entra — `teamKey` (segredo da
+  equipe), `timeActive` (cronômetro correndo), `recentPages`, `sidebarExpanded`,
+  `deviceName`, `lastSyncAt`, `lastRemoteDevice`. Essas três últimas são estado
+  do aparelho: se viajassem, cada push mudaria o snapshot do outro lado e os
+  aparelhos ficariam num ping-pong infinito de sincronização.
+- **Mesclagem** (`importWorkspace(data, {merge:true})`) é item a item pelo
+  `updatedAt`: o mais recente vence dos dois lados, e devolve
+  `{pages, databases, settings, removed, skipped}`. Antes o remoto sobrescrevia
+  tudo — editar no celular e sincronizar depois apagava a edição do computador.
+- **Lápides**: o `trash` do snapshot remove localmente o que o outro aparelho
+  apagou, a menos que o item tenha sido editado depois da remoção. Sem isso o
+  aparelho que ainda tinha a página a devolvia no próximo push.
+- `settings` do snapshot são aplicadas na importação (preferências, blocos de
+  tempo, metas, templates) e disparam `settings:changed` com `key:"*"`, que o
+  shell entende como "repinte a aparência".
+- `syncState()` devolve `{status, user, configured, unlocked, lastPushAt,
+  lastPullAt, lastSyncAt, device, remoteDevice}`.
+- `diagnose()` checa com `fetch` puro (sem SDK) — API REST, tabela `workspaces`,
+  `/auth/v1/health`, WebCrypto e sessão — e cada passo que falha carrega o
+  conserto em texto. É o que a tela da Nuvem mostra em "Testar tudo".
+- `validProjectUrl()` (cloud.js) aceita https em qualquer domínio (Supabase
+  hospedado ou próprio) e http só em localhost/127.0.0.1.
 
 ## Equipe — contrato (js/core/team.js + js/modules/team.js)
 

@@ -4,7 +4,7 @@ import {
   getSetting, setSetting, workspaceStats, exportWorkspace, importWorkspace, listPages,
 } from "../core/store.js";
 import { estimateStorage } from "../core/db.js";
-import { h, download, todayKey } from "../core/utils.js";
+import { h, download, todayKey, fmtRelative } from "../core/utils.js";
 import { toast, confirmDialog, promptDialog, showMenu } from "../core/ui.js";
 import { navigate } from "../core/router.js";
 import { setTheme } from "../shell.js";
@@ -173,90 +173,31 @@ function buildSyncBody() {
   const st = sync.syncState();
   const box = h("div", {});
 
-  // selo de status
-  const statusText = { off: "Desconectado", ready: "Sincronizado ✓", syncing: "Sincronizando…", error: "Erro de sincronização", locked: "Bloqueado — informe a senha" }[st.status] || st.status;
+  const statusText = {
+    off: st.configured ? "Projeto pronto — falta entrar na conta" : "Somente neste aparelho",
+    ready: "No ar e sincronizado ✓", syncing: "Sincronizando…",
+    error: "Erro na última sincronização", locked: "Bloqueado — informe a senha",
+  }[st.status] || st.status;
+
   box.appendChild(h("div", { class: "sync-status sync-" + st.status },
     h("span", { class: "sync-dot" }),
     h("span", {}, statusText),
     st.user ? h("span", { class: "sync-email" }, st.user.email) : null));
 
   box.appendChild(h("p", { class: "settings-hint", style: "margin:6px 0 14px" },
-    "Login por e-mail/senha com sincronização entre dispositivos. Seus dados são criptografados neste aparelho (AES-256) antes de subir — o servidor guarda só texto cifrado."));
+    st.lastSyncAt
+      ? `Última sincronização ${fmtRelative(st.lastSyncAt)} · este aparelho: ${st.device}`
+      : "Use o NEXUS de qualquer aparelho: os dados são cifrados aqui (AES-256) antes de subir para um projeto seu — o servidor guarda só texto embaralhado."));
 
-  if (!st.configured) {
-    // configurar Supabase
-    const url = h("input", { class: "input", placeholder: "https://xxxx.supabase.co", value: getSetting("supabaseUrl", "") });
-    const key = h("input", { class: "input", placeholder: "chave anon public", value: getSetting("supabaseKey", "") });
-    const save = h("button", { class: "btn primary", onclick: () => {
-      if (!url.value.trim() || !key.value.trim()) { toast("Preencha URL e chave", { type: "warn" }); return; }
-      if (!/^https:\/\/[a-z0-9-]+\.supabase\.co$/i.test(url.value.trim())) {
-        toast("A URL deve ter o formato https://xxxx.supabase.co", { type: "warn" }); return;
-      }
-      sync.saveConfig(url.value, key.value); toast("Configuração salva — agora crie sua conta abaixo ↓");
-      bus.emit("sync:status", sync.syncState());
-    } }, "Salvar e continuar");
-    const copySql = h("button", { class: "btn ghost sm", onclick: async () => {
-      try { await navigator.clipboard.writeText(sync.SETUP_SQL); toast("SQL copiado ✓"); }
-      catch { toast("Não foi possível copiar — selecione o texto manualmente", { type: "warn" }); }
-    } }, "⧉ Copiar SQL");
-    box.append(
-      h("details", { class: "sync-setup", open: true },
-        h("summary", {}, "Como ativar (grátis, leva ~5 minutos)"),
-        h("ol", { class: "sync-steps" },
-          h("li", {},
-            h("div", {}, "Crie um projeto gratuito no Supabase:"),
-            h("a", { class: "btn ghost sm", href: "https://supabase.com/dashboard/new", target: "_blank", rel: "noopener", style: "margin-top:6px;display:inline-flex" }, "Criar projeto no Supabase ↗")),
-          h("li", {},
-            h("div", {}, "No projeto, abra SQL Editor → New query, cole o código abaixo e clique em Run (cria a tabela cifrada com segurança por usuário):"),
-            h("pre", { class: "sync-sql" }, sync.SETUP_SQL),
-            copySql),
-          h("li", {}, "Em Project Settings → API, copie a Project URL e a chave anon public e cole nos campos abaixo:"))),
-      rowEl("URL do projeto", url),
-      rowEl("Chave anon public", key),
-      h("div", { class: "btn-row" }, save));
-    return box;
-  }
-
-  if (st.status === "off") {
-    // login / cadastro
-    box.appendChild(h("p", { class: "settings-hint", style: "margin:0 0 12px" },
-      "Projeto configurado ✓ Agora crie sua conta (ou entre, se já criou noutro dispositivo) — mesmo e-mail e senha em qualquer aparelho sincronizam o mesmo workspace."));
-    const email = h("input", { class: "input", type: "email", placeholder: "seu@email.com", autocomplete: "username" });
-    const pass = h("input", { class: "input", type: "password", placeholder: "senha (mín. 6 caracteres)", autocomplete: "current-password" });
-    const msg = h("div", { style: "color:var(--danger);font-size:var(--fs-xs);min-height:14px" });
-    const setBusy = (busy) => { login.disabled = busy; signup.disabled = busy; login.textContent = busy ? "…" : "Entrar"; }
-    const doAuth = (fn, label) => async () => {
-      msg.textContent = "";
-      if (!email.value || pass.value.length < 6) { msg.textContent = "E-mail e senha (mín. 6) obrigatórios."; return; }
-      setBusy(true);
-      try { await fn(email.value.trim(), pass.value); toast(label + " ✓"); bus.emit("sync:status", sync.syncState()); }
-      catch (e) { msg.textContent = e.message || String(e); }
-      finally { setBusy(false); }
-    };
-    const login = h("button", { class: "btn primary", onclick: doAuth(sync.signIn, "Conectado") }, "Entrar");
-    const signup = h("button", { class: "btn ghost", onclick: doAuth(sync.signUp, "Conta criada") }, "Criar conta");
-    const reconfig = h("button", { class: "btn ghost sm", onclick: () => { sync.saveConfig("", ""); bus.emit("sync:status", sync.syncState()); } }, "Trocar projeto Supabase");
-    box.append(rowEl("E-mail", email), rowEl("Senha", pass), msg, h("div", { class: "btn-row" }, login, signup), h("div", { style: "margin-top:8px" }, reconfig));
-    return box;
-  }
-
-  if (st.status === "locked") {
-    const pass = h("input", { class: "input", type: "password", placeholder: "sua senha", autocomplete: "current-password" });
-    const msg = h("div", { style: "color:var(--danger);font-size:var(--fs-xs);min-height:14px" });
-    const unlock = h("button", { class: "btn primary", onclick: async () => {
-      try { await sync.unlock(pass.value); toast("Desbloqueado ✓"); bus.emit("sync:status", sync.syncState()); }
-      catch (e) { msg.textContent = e.message; }
-    } }, "Desbloquear e sincronizar");
-    box.append(h("p", { class: "settings-hint" }, `Sessão de ${st.user?.email}. Informe a senha para descriptografar e sincronizar.`),
-      rowEl("Senha", pass), msg, h("div", { class: "btn-row" }, unlock,
-        h("button", { class: "btn ghost", onclick: () => sync.signOut() }, "Sair")));
-    return box;
-  }
-
-  // conectado
-  const syncNow = h("button", { class: "btn", onclick: async () => { try { await sync.pullNow(); await sync.pushNow(); toast("Sincronizado ✓"); } catch (e) { toast(e.message, { type: "danger" }); } } }, "⟳ Sincronizar agora");
-  const out = h("button", { class: "btn ghost", onclick: async () => { await sync.signOut(); toast("Sessão encerrada"); bus.emit("sync:status", sync.syncState()); } }, "Sair");
-  box.append(h("div", { class: "btn-row" }, syncNow, out));
+  const abrir = h("button", { class: "btn primary", onclick: () => navigate("cloud") },
+    st.configured ? "☁ Abrir a Nuvem" : "☁ Ligar a nuvem");
+  const agora = st.status === "ready"
+    ? h("button", { class: "btn", onclick: async () => {
+        try { await sync.pullNow(); await sync.pushNow({ force: true }); toast("Sincronizado ✓"); }
+        catch (e) { toast(String(e.message || e), { type: "danger" }); }
+      } }, "⟳ Sincronizar agora")
+    : null;
+  box.appendChild(h("div", { class: "btn-row" }, abrir, agora));
   return box;
 }
 

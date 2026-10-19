@@ -20,6 +20,7 @@ async function boot() {
   registerRoute("time", () => import("./modules/time.js"));
   registerRoute("assistant", () => import("./modules/assistant.js"));
   registerRoute("team", () => import("./modules/team.js"));
+  registerRoute("cloud", () => import("./modules/cloud.js"));
   registerRoute("tags", () => import("./modules/tags.js"));
   registerRoute("graph", () => import("./modules/graph.js"));
   registerRoute("settings", () => import("./modules/settings.js"));
