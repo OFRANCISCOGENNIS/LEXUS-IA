@@ -107,7 +107,7 @@ function wizard() {
 
   /* passo 3 */
   const url = h("input", { class: "input", placeholder: "https://xxxx.supabase.co", value: getSetting("supabaseUrl", ""), spellcheck: "false" });
-  const key = h("input", { class: "input", placeholder: "chave anon public", value: getSetting("supabaseKey", ""), spellcheck: "false" });
+  const key = h("input", { class: "input", placeholder: "sb_publishable_… (ou a anon public)", value: getSetting("supabaseKey", ""), spellcheck: "false" });
   const msg = h("div", { class: "cloud-msg" });
   const save = h("button", { class: "btn primary" }, "Verificar e salvar");
   save.onclick = async () => {
@@ -117,7 +117,9 @@ function wizard() {
       msg.textContent = "Endereço inválido. Use a Project URL do Supabase (https://xxxx.supabase.co) — ou o endereço do seu Supabase próprio.";
       return;
     }
-    if (!k) { msg.className = "cloud-msg err"; msg.textContent = "Cole a chave anon public."; return; }
+    if (!k) { msg.className = "cloud-msg err"; msg.textContent = "Cole a chave pública do projeto."; return; }
+    const aviso = keyProblem(k);
+    if (aviso) { msg.className = "cloud-msg err"; msg.textContent = aviso; return; }
     save.disabled = true;
     msg.className = "cloud-msg";
     msg.textContent = "Verificando o projeto…";
@@ -134,10 +136,31 @@ function wizard() {
 
   box.appendChild(step(3, "Conecte o NEXUS ao projeto",
     h("div", {},
-      h("p", { class: "cloud-step-text" }, "No projeto: Project Settings → API. Copie a Project URL e a chave anon public."),
-      row("URL do projeto", url), row("Chave anon public", key),
+      h("p", { class: "cloud-step-text" },
+        "No projeto: ", h("strong", {}, "Settings → API Keys"), ". Copie a ",
+        h("strong", {}, "Publishable key"), " (começa com sb_publishable_). Se o seu painel ainda tiver a aba ",
+        h("em", {}, "Legacy API keys"), ", a chave ", h("strong", {}, "anon public"), " também funciona. ",
+        "A URL do projeto fica no botão ", h("strong", {}, "Connect"), " (no topo) ou em Settings → API."),
+      row("URL do projeto", url), row("Chave pública", key),
       h("div", { class: "btn-row" }, save), msg)));
   return box;
+}
+
+/* Erra-se muito aqui: o Supabase pede uma senha do banco na criação do projeto,
+   e é fácil colar ela no lugar da chave da API. A chave pública é longa —
+   sb_publishable_… nas novas, eyJ… (JWT) nas antigas. E a chave secreta JAMAIS
+   pode entrar num app que roda no navegador: ela dá acesso total ao banco. */
+export function keyProblem(k) {
+  const key = String(k || "").trim();
+  if (/^sb_publishable_/.test(key)) return null;
+  if (/^eyJ[\w-]+\./.test(key)) return null;
+  if (/^sb_secret_/.test(key) || /service_role/i.test(key)) {
+    return "Essa é a chave SECRETA (secret / service_role) — ela dá acesso total ao banco e não pode ficar num app de navegador. Use a Publishable key (ou a anon public).";
+  }
+  if (key.length < 40) {
+    return "Isso parece a senha do banco de dados, não a chave da API. A chave fica em Settings → API Keys, começa com sb_publishable_ (ou eyJ… nas antigas) e tem centenas de caracteres.";
+  }
+  return null;
 }
 
 /* Aceita o Supabase hospedado, um Supabase próprio em domínio seu e, só em
@@ -193,6 +216,9 @@ function accountCard() {
 
   box.append(row("E-mail", email), row("Senha", pass), msg,
     h("div", { class: "btn-row" }, entrar, criar),
+    h("p", { class: "settings-hint", style: "margin-top:10px" },
+      "Se o Supabase pedir confirmação por e-mail ao criar a conta, confirme no link que ele enviar — ou desligue em ",
+      h("strong", {}, "Authentication → Sign In / Providers → Email → Confirm email"), "."),
     h("div", { style: "margin-top:10px" },
       h("button", { class: "btn ghost sm", onclick: () => { sync.saveConfig("", ""); bus.emit("sync:status", sync.syncState()); } }, "Trocar de projeto")));
   return box;

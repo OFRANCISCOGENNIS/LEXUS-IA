@@ -253,7 +253,7 @@ export async function diagnose() {
   const add = (name, ok, detail, fix = "") => steps.push({ name, ok, detail, fix });
 
   if (!url || !key) {
-    add("Projeto configurado", false, "URL ou chave ausente", "Preencha a URL do projeto e a chave anon public.");
+    add("Projeto configurado", false, "URL ou chave ausente", "Preencha a URL do projeto e a chave pública (Settings → API Keys).");
     return { ok: false, steps };
   }
   add("Projeto configurado", true, url.replace(/^https:\/\//, ""));
@@ -262,7 +262,7 @@ export async function diagnose() {
   try {
     const r = await fetch(`${url}/rest/v1/`, { headers: { apikey: key } });
     if (r.ok || r.status === 404) add("API do projeto responde", true, `HTTP ${r.status}`);
-    else if (r.status === 401) add("API do projeto responde", false, "HTTP 401", "A chave anon public não confere. Copie de novo em Project Settings → API.");
+    else if (r.status === 401) add("API do projeto responde", false, "HTTP 401", "A chave pública não confere. Copie de novo em Settings → API Keys (Publishable key, ou a anon public na aba Legacy).");
     else add("API do projeto responde", false, `HTTP ${r.status}`, "Confira a URL do projeto.");
   } catch {
     add("API do projeto responde", false, "sem resposta",
