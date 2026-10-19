@@ -8,7 +8,7 @@ import { pageToMarkdown, markdownToBlocks } from "../core/markdown.js";
 import { navigate } from "../core/router.js";
 import { bus } from "../core/bus.js";
 import { h, escapeHtml, stripHtml } from "../core/utils.js";
-import { toast, showMenu, confirmDialog } from "../core/ui.js";
+import { toast, showMenu, confirmDialog, focusSoon } from "../core/ui.js";
 import * as ai from "../core/ai.js";
 
 const MAX_KEPT = 40;
@@ -273,7 +273,7 @@ function insertAsPage(content) {
   navigate("page", p.id);
 }
 
-const focusComposer = () => setTimeout(() => document.getElementById("ai-input")?.focus(), 60);
+const focusComposer = () => focusSoon(document.getElementById("ai-input"));
 function scrollDown() {
   const t = document.getElementById("ai-thread");
   if (t) t.scrollTop = t.scrollHeight;

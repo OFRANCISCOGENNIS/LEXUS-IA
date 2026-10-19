@@ -12,6 +12,7 @@ import { showMenu, toast, emojiPicker, promptDialog, confirmDialog } from "./cor
 import * as sync from "./core/sync.js";
 import * as tracker from "./core/timetrack.js";
 import * as ai from "./core/ai.js";
+import * as team from "./core/team.js";
 
 /* ── Tema / aparência ── */
 export function applyAppearance() {
@@ -431,6 +432,21 @@ export function initShell() {
   };
   bus.on("ai:status", paintAi);
   paintAi();
+
+  // ── Equipe: o selo mostra quantas tarefas do time estão atrasadas ──
+  const paintTeam = () => {
+    const b = document.getElementById("nav-team-badge");
+    if (!b) return;
+    const others = Object.values(team.storedReports());
+    // mesma conta do painel (inclui as minhas), para o selo não divergir do KPI
+    const reports = others.length ? team.allReports() : [];
+    const late = reports.reduce((a, r) => a + (r?.counts?.overdue || 0), 0);
+    b.hidden = !others.length || late === 0;
+    b.textContent = late > 99 ? "99+" : String(late);
+    b.title = late ? `${late} tarefa(s) atrasada(s) no time` : "";
+  };
+  bus.on("team:changed", paintTeam);
+  paintTeam();
 
   // re-render reativo
   bus.on("pages:changed", () => { renderSidebar(); renderBreadcrumb(); });

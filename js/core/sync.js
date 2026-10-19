@@ -205,9 +205,24 @@ function startAuto() {
   const schedulePush = () => { clearTimeout(pushTimer); pushTimer = setTimeout(() => pushNow().catch(() => {}), 4000); };
   autoOffs.push(bus.on("pages:changed", schedulePush));
   autoOffs.push(bus.on("dbs:changed", schedulePush));
-  const EPHEMERAL_KEYS = new Set(["recentPages", "sidebarExpanded", "timeActive"]);
+  // teamKey é o segredo da equipe: fica só neste aparelho, nem cifrado sobe
+  const EPHEMERAL_KEYS = new Set(["recentPages", "sidebarExpanded", "timeActive", "teamKey"]);
   autoOffs.push(bus.on("settings:changed", ({ key }) => { if (!key.startsWith("supabase") && !EPHEMERAL_KEYS.has(key)) schedulePush(); }));
 }
+
+/* Token da sessão (para chamadas REST diretas, como o espaço da equipe).
+   Sem sessão ou sem rede devolve null — quem chama decide o fallback. */
+let tokenMiss = 0;
+export async function authToken() {
+  // sem rede/CDN o import do SDK demora: erra uma vez e segura por 1 min
+  if (Date.now() - tokenMiss < 60000) return null;
+  try {
+    const c = await getClient();
+    const { data } = await c.auth.getSession();
+    return data?.session?.access_token || null;
+  } catch { tokenMiss = Date.now(); return null; }
+}
+export const currentUser = () => user;
 
 /* ── SQL de setup (mostrado nas Configurações) ── */
 export const SETUP_SQL = `create table if not exists workspaces (

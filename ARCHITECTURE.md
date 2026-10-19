@@ -17,6 +17,7 @@ css/
   database.css        views de database
   time.css            módulo Tempo (planejador, timeline, cronômetro, metas, revisão)
   assistant.css       assistente de IA (conversa, composer, markdown das respostas)
+  team.css            painel da equipe (cartões por pessoa, tarefas, semana)
   views.css           home/daily/settings/templates/trash/search/graph
 js/
   app.js              boot: registra rotas lazy → js/modules/*.js
@@ -31,14 +32,15 @@ js/
     markdown.js       pageToMarkdown(page), pageToHtml(page) — HTML autocontido, sem rede —, blocksToMarkdown(blocks), markdownToBlocks(md)
     timetrack.js      cronômetro/sessões (ver abaixo) — vive fora da tela para contar durante a navegação
     ai.js             cliente do gateway de IA (OpenAI-compatível) — ver contrato abaixo
+    team.js           espaço da equipe: relatório, cifra com a senha do time, REST do Supabase
   modules/            um módulo por rota — default export { mount(container, params), unmount() }
 ```
 
 ## Rotas (hash)
 
 `#/home` `#/page/:id` `#/db/:id` `#/daily` `#/graph` `#/settings` `#/templates`
-`#/trash` `#/search/:query?` `#/time/:tab?` `#/assistant/:pageId?` — registradas em
-`app.js` com import lazy.
+`#/trash` `#/search/:query?` `#/time/:tab?` `#/assistant/:pageId?` `#/team/:tab?` —
+registradas em `app.js` com import lazy.
 `params.id` chega ao `mount(container, params)` já decodificado.
 Em `#/time` o `params.id` é a aba (`plan` · `timeline` · `track` · `goals` · `review`);
 sem aba, abre a última usada (setting `timeTab`) e o módulo corrige a URL com
@@ -135,6 +137,8 @@ Stats/backup: `workspaceStats()`, `exportWorkspace()→objeto`, `importWorkspace
 - `palette:open` · `capture:open` · `shortcuts:open` — sem payload
 - `timer:changed` `{type:"start"|"stop"|"sessions", timer?, session?}` — cronômetro; o selo
   da topbar (shell.js) e as abas Cronômetro/Revisão ouvem para repintar
+- `team:changed` `{type:"config"|"reports"|"published"|"pulled"|"left", ...}` — espaço da
+  equipe; o painel e o selo da navegação ouvem
 - `ai:status` `{enabled, model, baseUrl}` ou `{ok, models|error}` — emitido por `setAiConfig()` e `ping()`; o selo da navegação (shell.js) e a tela do assistente ouvem para repintar
 
 ## Convenções de UI (OBRIGATÓRIAS)
@@ -146,6 +150,37 @@ Stats/backup: `workspaceStats()`, `exportWorkspace()→objeto`, `importWorkspace
 - Ícones: caracteres unicode/emoji (sem libs externas).
 - `h()` de utils.js para construir DOM; nunca innerHTML com dados do usuário sem `escapeHtml`.
 - Overlays via `ui.js` (showMenu/showModal/toast) para consistência.
+
+## Equipe — contrato (js/core/team.js + js/modules/team.js)
+
+Ninguém abre o workspace para ninguém. O que circula é um **relatório**: números
+e metadados de trabalho, cifrados neste aparelho com a senha da equipe antes de
+sair. Páginas privadas e conteúdo de blocos nunca entram.
+
+- `teamSpace` (settings): `{id, name, memberId, memberName, color, autoPublish,
+  shareTitles, lastPublish, lastPull}`. A senha fica separada em `teamKey` e é
+  **ephemeral no sync** — nem cifrada ela sobe; cada aparelho entra uma vez.
+- Chave: PBKDF2-SHA256 150k sobre a senha, salt `nexus-team:<id>` → AES-GCM 256.
+  Relatório de outra equipe (senha diferente) simplesmente não decifra e é
+  ignorado no pull — é assim que espaços diferentes convivem na mesma tabela.
+- `buildReport()` devolve `{v, member, at, range, counts, tasks[], time[], note,
+  titlesHidden}`. `counts` traz pending/overdue/doneWeek/dueWeek/trackedSec/
+  plannedMin/blocksDone/blocksTotal/pomodoros. `tasks` é limitado a 80 e só tem
+  título, data, origem e flags. Com `shareTitles:false` os títulos viram
+  "(título oculto)" e só os números saem.
+- Transporte: **REST direto do PostgREST** (`fetch`), não o SDK — o mesmo projeto
+  Supabase da sincronização, tabela `team_reports` (SQL em `SETUP_SQL`, mostrado
+  na aba Espaço). Usa o token da sessão quando há (`sync.authToken()`), senão a
+  chave anon; a RLS é que decide.
+- `publishReport({note})` faz upsert por `(team_id, member_id)`; `pullReports()`
+  busca a equipe inteira, decifra o que der e guarda em `teamReports` (cache
+  local, para o painel abrir offline). O meu relatório é sempre recalculado na
+  hora, nunca lido do cache.
+- `startAutoTeam()` (chamado no boot): puxa e, se algo mudou, publica — no
+  máximo a cada 5 minutos.
+- Sem servidor nenhum também funciona: `exportReport()` / `importReport(json)`
+  trocam o mesmo relatório por arquivo, e o painel aceita relatórios importados
+  mesmo sem espaço configurado.
 
 ## Assistente de IA — contrato (js/core/ai.js + js/modules/assistant.js)
 

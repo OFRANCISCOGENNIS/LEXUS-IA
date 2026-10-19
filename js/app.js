@@ -19,6 +19,7 @@ async function boot() {
   registerRoute("calendar", () => import("./modules/calendar.js"));
   registerRoute("time", () => import("./modules/time.js"));
   registerRoute("assistant", () => import("./modules/assistant.js"));
+  registerRoute("team", () => import("./modules/team.js"));
   registerRoute("tags", () => import("./modules/tags.js"));
   registerRoute("graph", () => import("./modules/graph.js"));
   registerRoute("settings", () => import("./modules/settings.js"));
@@ -39,6 +40,9 @@ async function boot() {
 
   // retoma sessão de sincronização (se configurada) sem bloquear o boot
   import("./core/sync.js").then((s) => s.initSync().catch(() => {})).catch(() => {});
+
+  // espaço da equipe: publica/puxa em segundo plano, se estiver configurado
+  import("./core/team.js").then((t) => { try { t.startAutoTeam(); } catch {} }).catch(() => {});
 
   document.getElementById("app").classList.add("anim-fade");
 }

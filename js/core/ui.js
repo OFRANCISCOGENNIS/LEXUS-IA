@@ -124,6 +124,18 @@ export function showModal({ title, body, footer, width, onClose }) {
   return { close, modal, body: bodyEl };
 }
 
+/* Foca o primeiro campo depois da animação de entrada — sem roubar o foco de
+   quem já começou a digitar em outro campo do mesmo overlay. */
+export function focusSoon(el, delay = 60) {
+  if (!el) return;
+  setTimeout(() => {
+    const root = el.closest?.(".modal, .palette, .menu") || null;
+    const active = document.activeElement;
+    if (root && active && active !== document.body && active !== el && root.contains(active)) return;
+    try { el.focus(); el.select?.(); } catch {}
+  }, delay);
+}
+
 /* ── Confirm ── */
 export function confirmDialog({ title = "Tem certeza?", message = "", confirmText = "Confirmar", danger = false }) {
   return new Promise((resolve) => {
@@ -157,7 +169,7 @@ export function promptDialog({ title, label = "", value = "", placeholder = "", 
     input.addEventListener("keydown", (e) => { if (e.key === "Enter") ok.click(); });
     ok.onclick = () => { resolve(input.value); m.close(); };
     cancel.onclick = () => { resolve(null); m.close(); };
-    setTimeout(() => { input.focus(); input.select(); }, 50);
+    focusSoon(input, 50);
   });
 }
 

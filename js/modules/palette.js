@@ -39,6 +39,9 @@ function commands() {
     { icon: "🏷", title: "Abrir Tags & Coleções", kind: "Navegar", run: () => navigate("tags") },
     { icon: "☁", title: "Sincronizar entre dispositivos", kind: "Ação", run: () => navigate("settings") },
     { icon: "🍅", title: "Iniciar Pomodoro", kind: "Ação", run: () => navigate("productivity") },
+    { icon: "👥", title: "Painel da equipe", kind: "Navegar", run: () => navigate("team", "painel") },
+    { icon: "👥", title: "Tarefas da equipe", kind: "Navegar", run: () => navigate("team", "tarefas") },
+    { icon: "👥", title: "Semana da equipe", kind: "Navegar", run: () => navigate("team", "semana") },
     { icon: "✳", title: "Abrir assistente de IA", kind: "Navegar", run: () => navigate("assistant") },
     { icon: "✳", title: "Perguntar ao assistente sobre esta página", kind: "Ação", run: () => {
       const r = parseHash();

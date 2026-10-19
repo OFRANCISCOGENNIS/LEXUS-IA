@@ -1,0 +1,111 @@
+/* ═══════════════ NEXUS · Equipe ═══════════════ */
+
+.team-page { max-width: 1100px; }
+.team-head { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--sp-4); flex-wrap: wrap; }
+.team-sub { color: var(--text-3); font-size: var(--fs-sm); margin-top: 2px; }
+.team-head-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+.team-tabs { flex-wrap: wrap; }
+
+/* ── onboarding ── */
+.team-onboard { margin-top: var(--sp-5); padding: var(--sp-5); }
+.team-onboard h2 { font-size: var(--fs-lg); font-weight: 650; margin-bottom: var(--sp-2); }
+.team-lead { color: var(--text-2); font-size: var(--fs-sm); line-height: 1.65; margin-bottom: var(--sp-4); }
+.team-steps { display: flex; flex-direction: column; gap: var(--sp-2); margin: 0 0 var(--sp-4); padding-left: var(--sp-5); }
+.team-steps li { color: var(--text-2); font-size: var(--fs-sm); line-height: 1.6; }
+.team-steps code, .team-code {
+  font-family: var(--font-mono); font-size: .88em;
+  background: var(--code-bg); padding: 1px 6px; border-radius: 4px;
+}
+.team-onboard-actions { display: flex; gap: var(--sp-2); flex-wrap: wrap; }
+.team-alone {
+  font-size: var(--fs-sm); color: var(--text-2); line-height: 1.6;
+  background: var(--surface-2); border-radius: var(--r-md);
+  padding: var(--sp-3) var(--sp-4); margin-bottom: var(--sp-4);
+}
+
+/* ── painel ── */
+.team-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: var(--sp-4); }
+.team-card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-left: 3px solid var(--c); border-radius: var(--r-lg);
+  padding: var(--sp-4); box-shadow: var(--shadow-sm);
+  display: flex; flex-direction: column; gap: var(--sp-3);
+}
+.team-card.me { border-color: var(--accent); border-left-color: var(--c); background: var(--accent-softer); }
+.tc-head { display: flex; align-items: center; gap: var(--sp-3); }
+.tc-avatar {
+  width: 34px; height: 34px; flex: none; border-radius: var(--r-full);
+  display: grid; place-items: center; font-size: var(--fs-xs); font-weight: 750;
+  background: color-mix(in srgb, var(--c) 20%, var(--surface));
+  color: var(--c); border: 1px solid color-mix(in srgb, var(--c) 45%, transparent);
+}
+.tc-id { flex: 1; min-width: 0; }
+.tc-name { font-weight: 650; font-size: var(--fs-md); display: flex; align-items: center; gap: 6px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tc-me { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--accent-text); background: var(--accent-soft); padding: 1px 6px; border-radius: var(--r-full); }
+.tc-when { font-size: var(--fs-xs); color: var(--text-3); }
+
+.tc-kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--sp-2); }
+.tc-kpi { text-align: center; }
+.tck-num { font-size: var(--fs-lg); font-weight: 700; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.tck-label { font-size: 10px; color: var(--text-3); line-height: 1.2; }
+.tc-kpi.danger .tck-num { color: var(--danger); }
+.tc-kpi.ok .tck-num { color: var(--ok); }
+
+.tc-plan { display: flex; flex-direction: column; gap: 4px; }
+.tc-plan-bar { height: 6px; background: var(--surface-2); border-radius: var(--r-full); overflow: hidden; }
+.tc-plan-fill { height: 100%; background: var(--c); border-radius: var(--r-full); }
+.tc-plan-label { font-size: var(--fs-xs); color: var(--text-3); }
+.tc-note { font-size: var(--fs-sm); color: var(--text-2); font-style: italic; line-height: 1.5; }
+
+.tc-flags { display: flex; gap: 6px; flex-wrap: wrap; }
+.tc-flag {
+  font-size: 10px; font-weight: 650; padding: 2px 8px; border-radius: var(--r-full);
+  background: var(--surface-2); color: var(--text-2);
+}
+.tc-flag.danger { background: var(--danger-soft); color: var(--danger); }
+.tc-flag.warn { background: var(--warn-soft); color: var(--warn); }
+.tc-flag.ok { background: var(--ok-soft); color: var(--ok); }
+
+.tc-tasks { display: flex; flex-direction: column; gap: 2px; border-top: 1px solid var(--border); padding-top: var(--sp-2); }
+.tc-task { display: flex; align-items: center; gap: var(--sp-2); font-size: var(--fs-xs); }
+.tct-dot { width: 5px; height: 5px; border-radius: var(--r-full); background: var(--danger); flex: none; }
+.tct-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-2); }
+.tct-date { color: var(--danger); font-weight: 650; flex: none; }
+
+/* ── tarefas consolidadas ── */
+.team-task-list { display: flex; flex-direction: column; gap: 2px; margin-bottom: var(--sp-4); }
+.team-task {
+  display: flex; align-items: center; gap: var(--sp-3);
+  padding: 7px 10px; border-radius: var(--r-md);
+  background: var(--surface); border: 1px solid var(--border);
+}
+.team-task.done { opacity: .6; }
+.team-task.done .tt-title { text-decoration: line-through; }
+.tt-avatar {
+  width: 22px; height: 22px; flex: none; border-radius: var(--r-full);
+  display: grid; place-items: center; font-size: 9px; font-weight: 750;
+  background: color-mix(in srgb, var(--c) 20%, var(--surface));
+  color: var(--c); border: 1px solid color-mix(in srgb, var(--c) 45%, transparent);
+}
+.tt-title { flex: 1; min-width: 0; font-size: var(--fs-sm); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tt-origin { font-size: var(--fs-xs); color: var(--text-3); flex: none; max-width: 28%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tt-date { font-size: var(--fs-xs); color: var(--text-3); flex: none; font-variant-numeric: tabular-nums; }
+.tt-date.overdue { color: var(--danger); font-weight: 650; }
+
+/* ── semana ── */
+.team-week-card { border-top: 3px solid var(--c); }
+.team-week-sub {
+  font-size: var(--fs-xs); font-weight: 700; text-transform: uppercase;
+  letter-spacing: .04em; color: var(--text-faint); margin: var(--sp-3) 0 4px;
+}
+
+/* ── espaço ── */
+.team-sql { max-height: 220px; overflow: auto; font-size: 11px; }
+
+@media (max-width: 720px) {
+  .team-page { padding-left: var(--sp-3); padding-right: var(--sp-3); }
+  .team-grid { grid-template-columns: 1fr; }
+  .tc-kpis { grid-template-columns: repeat(2, 1fr); gap: var(--sp-3); }
+  .tt-origin { display: none; }
+  .team-head-actions { width: 100%; }
+}

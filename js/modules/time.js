@@ -16,7 +16,7 @@ import { listReminders } from "../core/reminders.js";
 import { navigate } from "../core/router.js";
 import { bus } from "../core/bus.js";
 import { h, todayKey, fmtDate, uid, clamp, escapeHtml } from "../core/utils.js";
-import { toast, showMenu, showModal, confirmDialog, promptDialog } from "../core/ui.js";
+import { toast, showMenu, showModal, confirmDialog, promptDialog, focusSoon } from "../core/ui.js";
 import { collectTasks } from "./tasks.js";
 import * as tt from "../core/timetrack.js";
 
@@ -524,7 +524,7 @@ function blockModal({ date, start = "09:00", end = "10:00", block = null, ref = 
     m.close();
     render();
   };
-  setTimeout(() => fTitle.focus(), 60);
+  focusSoon(fTitle);
 }
 
 const field = (label, control) =>
@@ -890,7 +890,7 @@ function manualSessionModal() {
     m.close();
     render();
   };
-  setTimeout(() => fLabel.focus(), 60);
+  focusSoon(fLabel);
 }
 
 /* ════════════════════════════════════════════════════════════
@@ -1093,7 +1093,7 @@ function goalModal(g = null) {
     m.close();
     render();
   };
-  setTimeout(() => fTitle.focus(), 60);
+  focusSoon(fTitle);
 }
 
 /* ════════════════════════════════════════════════════════════

@@ -3,14 +3,14 @@
 // Nenhum dado do usuário é armazenado aqui (isso vive em IndexedDB);
 // só o "casco" estático do app fica em cache.
 
-const CACHE = "nexus-shell-v17";
+const CACHE = "nexus-shell-v18";
 const ASSETS = [
   "./",
   "./index.html",
   "./manifest.webmanifest",
   "./css/tokens.css", "./css/base.css", "./css/shell.css", "./css/components.css",
   "./css/editor.css", "./css/database.css", "./css/views.css",
-  "./css/productivity.css", "./css/time.css", "./css/assistant.css", "./css/polish.css", "./css/redesign.css", "./css/mobile.css", "./css/print.css",
+  "./css/productivity.css", "./css/time.css", "./css/assistant.css", "./css/team.css", "./css/polish.css", "./css/redesign.css", "./css/mobile.css", "./css/print.css",
   "./css/fonts.css", "./fonts/manrope-latin.woff2", "./fonts/lora-latin.woff2", "./fonts/lora-italic-latin.woff2",
   "./js/app.js",
   "./js/shell.js",
@@ -20,8 +20,8 @@ const ASSETS = [
   "./js/modules/home.js", "./js/modules/daily.js", "./js/modules/graph.js",
   "./js/modules/search.js", "./js/modules/settings.js", "./js/modules/templates.js",
   "./js/modules/trash.js", "./js/modules/productivity.js", "./js/modules/tasks.js", "./js/modules/tags.js", "./js/modules/calendar.js",
-  "./js/modules/time.js", "./js/modules/assistant.js",
-  "./js/core/privacy.js", "./js/core/sync.js", "./js/core/timetrack.js", "./js/core/ai.js",
+  "./js/modules/time.js", "./js/modules/assistant.js", "./js/modules/team.js",
+  "./js/core/privacy.js", "./js/core/sync.js", "./js/core/timetrack.js", "./js/core/ai.js", "./js/core/team.js",
 ];
 
 self.addEventListener("install", (e) => {
