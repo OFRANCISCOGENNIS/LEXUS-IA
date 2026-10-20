@@ -7,6 +7,7 @@ import {
 import { navigate } from "../core/router.js";
 import { h, uid, escapeHtml, fmtDate, flip, download, debounce, todayKey, isMac, fmtRelative } from "../core/utils.js";
 import { showMenu, closeMenus, toast, confirmDialog, promptDialog, emojiPicker, showModal } from "../core/ui.js";
+import { parseCsv, guessType } from "../core/csv.js";
 
 const PROP_TYPES = [
   { type: "text", icon: "Aa", name: "Texto" },
@@ -167,36 +168,6 @@ function exportCsv(db) {
 /* ═══════════ Importar CSV ═══════════
    Parser que respeita aspas, vírgulas e quebras de linha dentro do campo —
    um CSV exportado de planilha entra sem precisar de limpeza manual. */
-export function parseCsv(text) {
-  const rows = [];
-  let row = [], field = "", quoted = false;
-  const s = text.replace(/\r\n?/g, "\n");
-  for (let i = 0; i < s.length; i++) {
-    const c = s[i];
-    if (quoted) {
-      if (c === '"') {
-        if (s[i + 1] === '"') { field += '"'; i++; }   // aspas escapadas
-        else quoted = false;
-      } else field += c;
-    } else if (c === '"') quoted = true;
-    else if (c === ",") { row.push(field); field = ""; }
-    else if (c === "\n") { row.push(field); rows.push(row); row = []; field = ""; }
-    else field += c;
-  }
-  if (field !== "" || row.length) { row.push(field); rows.push(row); }
-  return rows.filter((r) => r.some((c) => c.trim() !== ""));
-}
-
-/* adivinha o tipo da coluna pelos valores (data → número → checkbox → texto) */
-function guessType(values) {
-  const vals = values.filter((v) => v.trim() !== "");
-  if (!vals.length) return "text";
-  if (vals.every((v) => /^\d{4}-\d{2}-\d{2}$/.test(v.trim()))) return "date";
-  if (vals.every((v) => /^-?[\d.,]+$/.test(v.trim()) && !isNaN(parseFloat(v.replace(",", "."))))) return "number";
-  if (vals.every((v) => /^(sim|não|nao|true|false|x|)$/i.test(v.trim()))) return "checkbox";
-  return "text";
-}
-
 function importCsvFlow() {
   const input = h("input", { type: "file", accept: ".csv,text/csv", style: "display:none" });
   input.addEventListener("change", async () => {

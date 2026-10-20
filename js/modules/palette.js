@@ -49,6 +49,7 @@ function commands() {
       r.name === "page" && r.params.id ? navigate("assistant", r.params.id) : navigate("assistant");
     } },
     { icon: "◉", title: "Ver grafo de conhecimento", kind: "Navegar", run: () => navigate("graph") },
+    { icon: "⬆", title: "Importar do Notion (.zip)", kind: "Ação", run: () => navigate("settings") },
     { icon: "▤", title: "Galeria de templates", kind: "Navegar", run: () => navigate("templates") },
     { icon: "⚙", title: "Configurações", kind: "Navegar", run: () => navigate("settings") },
     { icon: "🗑", title: "Abrir lixeira", kind: "Navegar", run: () => navigate("trash") },

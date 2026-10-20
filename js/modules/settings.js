@@ -5,7 +5,7 @@ import {
 } from "../core/store.js";
 import { estimateStorage } from "../core/db.js";
 import { h, download, todayKey, fmtRelative } from "../core/utils.js";
-import { toast, confirmDialog, promptDialog, showMenu } from "../core/ui.js";
+import { toast, confirmDialog, promptDialog, showMenu, showModal } from "../core/ui.js";
 import { navigate } from "../core/router.js";
 import { setTheme } from "../shell.js";
 import { pageToMarkdown } from "../core/markdown.js";
@@ -99,6 +99,21 @@ export default {
     });
 
     data.appendChild(rowEl("Backup completo", h("div", { class: "btn-row" }, exportBtn, importBtn, fileInput)));
+
+    /* ── Importar do Notion ── */
+    const notionInput = h("input", { type: "file", accept: ".zip,.md,.csv", multiple: true, style: "display:none" });
+    notionInput.addEventListener("change", async () => {
+      const picked = [...notionInput.files];
+      notionInput.value = "";
+      if (picked.length) await notionFlow(picked);
+    });
+    data.appendChild(rowEl("Vindo do Notion",
+      h("div", { class: "btn-row" },
+        h("button", { class: "btn", onclick: () => notionInput.click() }, "⬆ Importar export do Notion"),
+        notionInput)));
+    data.appendChild(h("p", { class: "settings-hint", style: "margin:-6px 0 12px" },
+      "No Notion: ⋯ → Export → formato ", h("strong", {}, "Markdown & CSV"),
+      ", marque “Include subpages”. Depois solte o .zip aqui — páginas, sub-páginas e databases entram no seu workspace. O arquivo é lido neste aparelho, não sai daqui."));
     data.appendChild(rowEl("Portabilidade", h("div", { class: "btn-row" }, mdBtn)));
 
     const storageEl = h("span", { class: "settings-hint" }, "calculando…");
@@ -199,6 +214,79 @@ function buildSyncBody() {
     : null;
   box.appendChild(h("div", { class: "btn-row" }, abrir, agora));
   return box;
+}
+
+/* ═══════════ Importar do Notion ═══════════ */
+async function notionFlow(picked) {
+  const prog = h("div", { class: "cloud-msg" }, "Lendo o arquivo…");
+  const modal = showModal({ title: "Importar do Notion", body: prog, width: 560 });
+  try {
+    const [{ unzip }, notion] = await Promise.all([import("../core/zip.js"), import("../core/notion.js")]);
+
+    let files = [];
+    for (const f of picked) {
+      if (/\.zip$/i.test(f.name)) {
+        prog.textContent = `Abrindo ${f.name}…`;
+        files.push(...await unzip(await f.arrayBuffer()));
+      } else {
+        files.push({ name: f.name, bytes: new Uint8Array(await f.arrayBuffer()) });
+      }
+    }
+    if (!files.length) throw new Error("Não encontrei arquivos dentro do que você escolheu.");
+
+    const info = notion.analyzeNotion(files);
+    if (!info.counts.pages && !info.counts.databases && !info.counts.rowPages) {
+      throw new Error("Não achei páginas (.md) nem databases (.csv) aí dentro. No Notion, exporte em “Markdown & CSV”.");
+    }
+
+    modal.close();
+    await confirmImport(info, notion, files);
+  } catch (e) {
+    prog.className = "cloud-msg err";
+    prog.textContent = String(e.message || e);
+  }
+}
+
+function confirmImport(info, notion, files) {
+  return new Promise((resolve) => {
+    const c = info.counts;
+    const withRows = h("input", { type: "checkbox" });
+    const body = h("div", {},
+      h("p", { class: "cloud-lead" }, "Encontrei no export:"),
+      h("ul", { class: "cloud-list yes" },
+        h("li", {}, `${c.pages} página(s)`),
+        h("li", {}, `${c.databases} database(s)`),
+        c.images ? h("li", {}, `${c.images} imagem(ns) — as até 2 MB entram embutidas nas páginas`) : null),
+      c.rowPages
+        ? h("label", { class: "tb-check", style: "margin-top:10px" }, withRows,
+            h("span", {}, `Importar também as ${c.rowPages} páginas de linhas das databases (o conteúdo de cada item; os dados já vêm na database)`))
+        : null,
+      h("p", { class: "settings-hint", style: "margin-top:12px" },
+        "Nada é apagado: o que já existe no NEXUS continua como está. Links entre páginas viram wiki-links [[assim]]."));
+
+    const ok = h("button", { class: "btn primary" }, "Importar");
+    const cancel = h("button", { class: "btn ghost" }, "Cancelar");
+    const m = showModal({ title: "Importar do Notion", body, footer: [cancel, ok], width: 560, onClose: resolve });
+    cancel.onclick = () => m.close();
+    ok.onclick = async () => {
+      ok.disabled = cancel.disabled = true;
+      const line = h("div", { class: "cloud-msg" }, "Importando…");
+      body.appendChild(line);
+      try {
+        const { stats } = await notion.importNotion(files, {
+          withRowPages: withRows.checked,
+          onProgress: (s) => { line.textContent = `Importando… ${s.pages} página(s), ${s.databases} database(s)`; },
+        });
+        m.close();
+        toast(`Importado: ${stats.pages} página(s), ${stats.databases} database(s), ${stats.rows} linha(s) ✓`, { duration: 5000 });
+        navigate("home");
+      } catch (e) {
+        ok.disabled = cancel.disabled = false;
+        line.className = "cloud-msg err";
+        line.textContent = String(e.message || e);
+      }
+    };
+  });
 }
 
 /* ═══════════ Assistente de IA (gateway OmniRoute local) ═══════════ */

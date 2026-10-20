@@ -30,6 +30,9 @@ js/
     router.js         navigate(name, id?), registerRoute, parseHash(), currentRoute()
     ui.js             toast(msg,{type}), showMenu(anchor, items, opts), closeMenus(), showModal({title,body,footer,width})→{close,body}, confirmDialog({...})→Promise<bool>, promptDialog({...})→Promise<string|null>, emojiPicker(anchor, onPick)
     utils.js          h(tag,attrs,...children), uid, debounce, throttle, clamp, escapeHtml, stripHtml, sanitizeInline, fuzzyScore, highlightMatch, todayKey, fmtDate, fmtRelative, flip(container,mutate), positionFloating, isMac, modKey, download, countWords, readingTime
+    csv.js            parseCsv(texto), guessType(valores)
+    zip.js            unzip(arrayBuffer) — stored + deflate via DecompressionStream
+    notion.js         importador do export do Notion (ver contrato abaixo)
     markdown.js       pageToMarkdown(page), pageToHtml(page) — HTML autocontido, sem rede —, blocksToMarkdown(blocks), markdownToBlocks(md)
     timetrack.js      cronômetro/sessões (ver abaixo) — vive fora da tela para contar durante a navegação
     ai.js             cliente do gateway de IA (OpenAI-compatível) — ver contrato abaixo
@@ -151,6 +154,36 @@ Stats/backup: `workspaceStats()`, `exportWorkspace()→objeto`, `importWorkspace
 - Ícones: caracteres unicode/emoji (sem libs externas).
 - `h()` de utils.js para construir DOM; nunca innerHTML com dados do usuário sem `escapeHtml`.
 - Overlays via `ui.js` (showMenu/showModal/toast) para consistência.
+
+## Importar do Notion (js/core/notion.js + js/core/zip.js)
+
+Lê o export **Markdown & CSV** do Notion inteiro no navegador — o .zip não
+sai do aparelho. `zip.js` é um leitor mínimo (diretório central + entradas
+`stored` e `deflate` via `DecompressionStream("deflate-raw")`), sem dependência.
+
+Como o Notion nomeia as coisas, e o que o importador faz com isso:
+
+- `Minha página <32 hex>.md` → página; o hash sai do título.
+- `Minha página <32 hex>/` → pasta com as sub-páginas: o `parentId` sai daí,
+  então a hierarquia chega inteira. As páginas são criadas em duas passadas
+  (todas primeiro, depois os vínculos) para não depender da ordem do zip.
+- `Banco <32 hex>.csv` **e** `Banco <32 hex>_all.csv` são a mesma database —
+  `dbKey()` tira o `_all` **antes** do hash (o sufixo vem depois dele) e a
+  versão normal ganha. CSV vazio não vira database.
+- Os `.md` dentro da pasta de uma database são as linhas, não páginas: por
+  padrão ficam de fora (os dados já vêm no CSV) e a tela oferece importá-los.
+- Colunas: `guessType()` resolve data/número/checkbox; texto com poucos
+  valores curtos e repetidos vira `select` (ou `multiselect` quando há
+  vírgulas) com as opções criadas — é assim que select do Notion se parece
+  num CSV. O valor da linha guarda o **id** da opção, não o texto.
+- Corpo: o H1 repetido e o bloco `Propriedade: valor` logo abaixo dele são
+  removidos; `![](caminho)` vira bloco de imagem com data: URL (teto de 2 MB
+  por imagem e 40 MB no total, o resto vira aviso); `[Título](pagina.md)`
+  vira `[[Título]]` e, numa terceira passada (quando todas as páginas já têm
+  id), em `<span class="wiki-link" data-page-id="…">` — texto `[[assim]]` não
+  conta como link: `pageLinks()` só enxerga `data-page-id`, então sem essa
+  passada não haveria backlink nem aresta no grafo. Link que aponta para fora
+  do export continua como texto.
 
 ## Nuvem / sincronização (js/core/sync.js + js/modules/cloud.js)
 
